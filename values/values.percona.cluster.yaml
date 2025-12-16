@@ -1,0 +1,59 @@
+nameOverride: db-cluster
+
+backup:
+  enabled: false
+  nodeSelector:
+    node: eyelevel-node
+
+haproxy:
+  enabled: true
+  nodeSelector:
+    node: eyelevel-node
+  resources:
+    requests:
+      cpu: 600m
+      memory: 1Gi
+  size: 1
+
+logcollector:
+  enabled: false
+  nodeSelector:
+    node: eyelevel-node
+
+nodeSelector:
+  node: eyelevel-node
+
+pmm:
+  enabled: false
+  nodeSelector:
+    node: eyelevel-node
+
+proxysql:
+  enabled: false
+  nodeSelector:
+    node: eyelevel-node
+
+pxc:
+  nodeSelector:
+    node: eyelevel-node
+  persistence:
+    size: 20Gi
+  resources:
+    requests:
+      cpu: 600m
+      memory: 512Mi
+  size: 1
+
+secrets:
+  passwords:
+    root: password
+    xtrabackup: password
+    monitor: password
+    clustercheck: password
+    proxyadmin: password
+    operator: password
+    replication: password
+
+unsafeFlags:
+  pxcSize: true
+  proxySize: true

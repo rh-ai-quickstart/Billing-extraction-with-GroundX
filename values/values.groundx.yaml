@@ -1,0 +1,74 @@
+licenseKey: 00000000-0000-0000-0000-000000000000
+mode: ingest
+
+cluster:
+  pvClass: eyelevel-pv
+  type: openshift
+
+  secrets:
+    - eyelevel-secret-credentials
+
+  preProcessors:
+    - processorId: 13
+      type: extract
+
+  nodeLabels:
+    cpuMemory: eyelevel-node
+    cpuOnly: eyelevel-node
+    gpuLayout: eyelevel-node
+    gpuRanker: eyelevel-node
+    gpuSummary: eyelevel-node
+
+groundx:
+  serviceType: Route
+
+engines:
+  default:
+    engineId: gpt-5-mini
+    reasoningEffort: low
+    vision: true
+
+summary:
+  existing:
+    # apiBaseUrl: https://api.openai.com/v1
+    serviceType: openai
+
+extract:
+  enabled: true
+
+  agent:
+    enabled: true
+
+    # apiBaseUrl: https://api.openai.com/v1
+    serviceType: openai
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+
+  api:
+    enabled: true
+
+    serviceType: Route
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  download:
+    enabled: true
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  save:
+    enabled: true
+
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi

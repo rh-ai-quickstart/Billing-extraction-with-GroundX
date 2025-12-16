@@ -1,0 +1,7 @@
+operator:
+  nodeSelector:
+    node: eyelevel-node
+  replicaCount: 1
+
+  containerSecurityContext: null
+  securityContext: null
