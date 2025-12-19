@@ -5,6 +5,8 @@ cluster:
   pvClass: eyelevel-pv
   type: openshift
 
+  imagePullPolicy: Always
+
   secrets:
     - eyelevel-secret-credentials
 
@@ -19,6 +21,9 @@ cluster:
     gpuRanker: eyelevel-node
     gpuSummary: eyelevel-node
 
+file:
+  customDomain: minio-eyelevel.apps.23629ac0-eyelevelai.openshiftpartnerlabs.com
+
 groundx:
   serviceType: Route
 
@@ -31,7 +36,7 @@ engines:
 summary:
   existing:
     # apiBaseUrl: https://api.openai.com/v1
-    serviceType: openai
+    serviceType: openai-base64
 
 extract:
   enabled: true

@@ -1,0 +1,41 @@
+statement:
+  fields:
+    account_number:
+      prompt:
+        description: unique identifier for the customer account
+        format: unique string, **always** formatted as a string
+        identifiers: ["Account Number"]
+        instructions: |
+          - This number uniquely identifies the user with the invoicer
+            - Account Number is **never** missing a label
+        type: str
+    amount_due:
+      prompt:
+        description: numerical value representing the amount that the customer owes
+        identifiers: ["Amount Due"]
+        instructions: |
+          - This is the total amount due by the customer, including previous balance and current charges
+        type: ["int", "float"]
+    due_date:
+      prompt:
+        description: date when payment is due from the customer
+        format: YYYY-mm-dd date string
+        identifiers: ["Due Date"]
+        instructions: |
+          - Dates within this bill are **extremely unlikely** to be more than 1 year apart from each other. If you find this to be the case, consider whether you are seeing a year vs a day (e.g. 2/23 being Feb 23 instead of Feb 2023).
+        type: str
+    provider_name:
+      prompt:
+        description: name of the company that issued the statement or invoice and is owed payment from the customer
+        identifiers: ["Remit Payment"]
+        instructions: |
+          - This is the provider that receives payment, not necessarily the provider who issues the bill
+        type: str
+    service_address:
+      prompt:
+        description: the location where the services are consumed by the customer
+        identifiers: ["Mail To"]
+        instructions: |
+          - This is the location where the customer receives mail
+        type: str
+

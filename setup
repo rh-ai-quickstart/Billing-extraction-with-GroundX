@@ -75,6 +75,9 @@ helm upgrade --install groundx-secret \
   -n eyelevel \
   -f values/values.groundx.secret.yaml
 
+# expose minio as a route
+oc expose svc/minio -n eyelevel
+
 # install GroundX
 helm upgrade --install groundx \
   groundx/groundx \
