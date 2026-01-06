@@ -1,6 +1,6 @@
 # Data extraction with GroundX with OpenShift AI
 
-GroundX by EyeLevel is an enterprise platform that eliminates LLM hallucinations by grounding AI responses in a company’s specific, private data. The platform utilizes advanced computer vision to preserve the context of complex document layouts, such as nested tables and schematics, ensuring high-fidelity search and retrieval. Beyond information discovery, it functions as a powerful tool for automated data extraction, transforming unstructured files into structured, verifiable insights with direct source citations.
+GroundX, from EyeLevel, is an enterprise platform that eliminates LLM hallucinations by grounding AI responses in a company’s specific, private data. The platform utilizes advanced computer vision to preserve the context of complex document layouts, such as nested tables and schematics, ensuring high-fidelity search and retrieval. Beyond information discovery, it functions as a powerful tool for automated data extraction, transforming unstructured files into structured, verifiable insights with direct source citations.
 
 When used with OpenShift AI on premises, customers can have complete control of their own data and where it is stored and processed.
 
@@ -30,10 +30,10 @@ You will deploy GroundX, as well as other components including MinIO (object sto
 ### See it in action
 
 1. Create a new project called `eyelevel` and deploy the following in the project:
-  - Custome storage class
-  - Percona MySQK
+  - Custom storage class
+  - Percona Server for MySQL
   - MinIO
-  - Strimzi Kafka
+  - Kafka
   - GroundX
 2. Run a Jupytper notebook to demostrate data extraction from a mobile phone bill
 
@@ -44,7 +44,7 @@ You will deploy GroundX, as well as other components including MinIO (object sto
 
 ## Requirements
 
-This quickstart was developed and test on an OpenShift cluster with the following components and resources. This can be considered the minimum requirements.
+This quickstart was developed and tested on an OpenShift cluster with the following components and resources. This can be considered the minimum requirements.
 
 ### Minimum hardware requirements 
 
@@ -68,6 +68,8 @@ This quickstart was tested with the following software versions:
 | helm                               | 3.17.1   |
 | GroundX                            | 2.9.92   |
 | MinIO                              | TBD      |
+| Strimzi Kafka                      | TBD      |
+| Percona MySQL                      | TBD      |
 
 
 ### Required user permissions
@@ -88,8 +90,9 @@ The steps assume the following pre-requisite products and components are deploye
 3. Red Hat OpenShift Serverless
 4. Red Hat OpenShift AI
 5. Node Feature Discovery operator
-6. Nvidia GPU operator75. User has `admin` permissions in the cluster
-7. The `eyelevel` project should not exist
+6. Nvidia GPU operator
+7. User has `admin` permissions in the cluster
+8. The `eyelevel` project should not exist
 
 ### Deployment Steps
 
@@ -97,7 +100,7 @@ The steps assume the following pre-requisite products and components are deploye
 ```
 $ git clone https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git
 
-cd Billing-extraction-with-GroundX
+$ cd Billing-extraction-with-GroundX
 ```
 
 2. Login to the OpenShift cluster:
