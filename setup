@@ -37,10 +37,6 @@ elif [ $# -gt 1 ]; then
     usage_and_exit "Too many arguments"
 fi
 
-# Error function on ERR signal
-set -e # Exit immediately if a command exits with a non-zero status
-trap 'error_handler' ERR
-
 project=$1
 
 # Create the project if it doesn't already exist
@@ -53,6 +49,10 @@ else
     oc new-project $project
 fi
 echo
+
+# Error function on ERR signal
+set -e # Exit immediately if a command exits with a non-zero status
+trap 'error_and_exit' ERR
 
 # install the groundx helm chart repo
 helm repo add groundx https://registry.groundx.ai/helm
