@@ -67,62 +67,58 @@ echo ""
 oc get nodes -L node
 echo ""
 
-# create the eyelevel namespace
-oc new-project eyelevel
-oc project eyelevel
-
 # create a default PV class for namespace
 helm upgrade --install groundx-storageclass \
   groundx/groundx-storageclass \
-  -n eyelevel
+  -n $project
 
 # install Percona MySQL
 helm upgrade --install db-operator \
   percona/pxc-operator \
-  -n eyelevel \
+  -n $project \
   -f values/values.percona.operator.yaml
 
 helm upgrade --install db-cluster \
   percona/pxc-db \
-  -n eyelevel \
+  -n $project \
   -f values/values.percona.cluster.yaml
 
 # install MinIO
-oc adm policy add-scc-to-user anyuid -z minio-operator -n eyelevel
-oc adm policy add-scc-to-user anyuid -z minio-tenant-sa -n eyelevel
+oc adm policy add-scc-to-user anyuid -z minio-operator -n $project
+oc adm policy add-scc-to-user anyuid -z minio-tenant-sa -n $project
 
 helm upgrade --install minio-operator \
   minio-operator/operator \
-  -n eyelevel \
+  -n $project \
   -f values/values.minio.operator.yaml
 
 helm upgrade --install minio-cluster \
   minio-operator/tenant \
-  -n eyelevel \
+  -n $project \
   -f values/values.minio.tenant.yaml
 
 # install Strimzi Kafka
 helm upgrade --install stream-operator \
   oci://quay.io/strimzi-helm/strimzi-kafka-operator \
-  -n eyelevel \
+  -n $project \
   -f values/values.strimzi.operator.yaml
 
 helm upgrade --install stream-cluster \
   groundx/groundx-strimzi-kafka-cluster \
-  -n eyelevel \
+  -n $project \
   -f values/values.strimzi.cluster.yaml
 
 # install GroundX secret
 helm upgrade --install groundx-secret \
   groundx/groundx-secret \
-  -n eyelevel \
+  -n $project \
   -f values/values.groundx.secret.yaml
 
 # expose minio as a route
-oc expose svc/minio -n eyelevel
+oc expose svc/minio -n $project
 
 # install GroundX
 helm upgrade --install groundx \
   groundx/groundx \
-  -n eyelevel \
+  -n $project \
   -f values/values.groundx.yaml
