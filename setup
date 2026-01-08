@@ -4,8 +4,51 @@
 # https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/steps-overview.html
 # 1. Install the Node Feature Discovery operator
 # 2. Install the NVIDIA GPU Operator
-
 echo "" && echo "" && echo "Don't forget to install the NVIDIA GPU OPERATOR!!!" && echo "https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/steps-overview.html" && echo "" && echo ""
+
+# Function: print usage and exit
+usage_and_exit () {
+    echo
+    echo $1
+    echo
+    echo "Usage: setup <project_name>"
+    echo
+    echo "Example: setup eyelevel"
+    echo
+    exit 1
+}
+
+# Function: error, print usage and exit
+error_and_exit () {
+    echo
+    echo $1
+    echo
+    echo "To clean up for another attempt, use:"
+    echo
+    echo "oc delete project $1"
+    echo
+    exit 1
+}
+
+# Validate a project name, and only that, is included
+if [ $# -lt 1 ]; then
+    usage_and_exit "Must include project to deploy to"
+elif [ $# -gt 1 ]; then
+    usage_and_exit "Too many arguments"
+fi
+
+project=$1
+
+# Create the project if it doesn't already exist
+oc get project $project > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "$project project already exists. Switching to it."
+    oc project $project
+else
+    echo "Creating new project $project and switching to it."
+    oc new-project $project
+fi
+echo
 
 # install the groundx helm chart repo
 helm repo add groundx https://registry.groundx.ai/helm
