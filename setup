@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e # Exit immediately if a command exits with a non-zero status
-
 # pre-requisites
 # https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/steps-overview.html
 # 1. Install the Node Feature Discovery operator
@@ -32,15 +30,16 @@ error_and_exit () {
     exit 1
 }
 
-# Error function on ERR signal
-trap 'error_handler' ERR
-
 # Validate a project name, and only that, is included
 if [ $# -lt 1 ]; then
     usage_and_exit "Must include project to deploy to"
 elif [ $# -gt 1 ]; then
     usage_and_exit "Too many arguments"
 fi
+
+# Error function on ERR signal
+set -e # Exit immediately if a command exits with a non-zero status
+trap 'error_handler' ERR
 
 project=$1
 
