@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+
+# Function: print usage and exit
+usage_and_exit () {
+    echo
+    echo $1
+    echo
+    echo "Usage: uninstall <project_name>"
+    echo
+    echo "Example: uninstall eyelevel"
+    echo
+    exit 1
+}
+
+# Function: error, print usage and exit
+error_and_exit () {
+    echo
+    echo "Review above logs, resolve and try again."
+    echo
+    echo "To clean up for another attempt, use:"
+    echo
+    if [ -n "${project:-}" ]; then
+        echo "oc delete project $project"
+    else
+        echo "oc delete project <project_name>"
+    fi
+    echo
+    exit 1
+}
+
+# Validate a project name, and only that, is included
+if [ $# -lt 1 ]; then
+    usage_and_exit "Must include project to uninstall"
+elif [ $# -gt 1 ]; then
+    usage_and_exit "Too many arguments"
+fi
+
+project=$1
+
+# Select the project (namespace) to uninstall from; require it to exist
+oc get project $project > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "$project project exists. Proceeding with the uninstall."
+    oc project "$project"
+else
+    echo "$project does not exist."
+    exit 1
+fi
+echo
+
+# Error function on ERR signal
+set -e # Exit immediately if a command exits with a non-zero status
+trap 'error_and_exit "$project"' ERR
+
+patch_finalizers_if_present () {
+  # Usage: patch_finalizers_if_present <resource> <name>
+  local res="$1"
+  local name="$2"
+  if oc get "$res" -n "$project" "$name" >/dev/null 2>&1; then
+    oc patch "$res" -n "$project" "$name" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
+  fi
+}
+
+wait_gone () {
+  # Usage: wait_gone "<command that returns 0 while resource exists>" [seconds]
+  local cmd="$1"
+  local sleep_s="${2:-5}"
+  for i in {1..120}; do
+    eval "$cmd" >/dev/null 2>&1 || return 0
+    sleep "$sleep_s"
+  done
+  return 1
+}
+
+wait_project_deleted () {
+  # Wait until the OpenShift project/namespace is fully deleted.
+  # Returns 0 if deleted, 1 if still present after timeout.
+  wait_gone "oc get project \"$project\"" 5
+}
+
+
+helm delete groundx-secret || true
+sleep 1
+
+helm delete groundx-storageclass || true
+sleep 1
+
+helm delete groundx || true
+sleep 1
+
+helm delete stream-cluster || true
+
+# Strimzi: ensure the Kafka CR is fully gone before removing the operator
+# Common resource names: `kafka` (short) or `kafkas.kafka.strimzi.io` (fully qualified)
+wait_gone "oc get kafka -n $project stream-cluster" 5 || true
+wait_gone "oc get kafkas.kafka.strimzi.io -n $project stream-cluster" 5 || true
+
+# If it still exists and is stuck due to finalizers (operator removed/failed), force-remove finalizers
+patch_finalizers_if_present kafka stream-cluster
+patch_finalizers_if_present kafkas.kafka.strimzi.io stream-cluster
+
+helm delete stream-operator || true
+sleep 1
+
+helm delete minio-cluster || true
+sleep 1
+
+# MinIO Operator: ensure the Tenant/Cluster CR is fully gone before removing the operator
+# Common resource names: `tenant` (short) or `tenants.minio.min.io` (fully qualified)
+wait_gone "oc get tenant -n $project minio-cluster" 5 || true
+wait_gone "oc get tenants.minio.min.io -n $project minio-cluster" 5 || true
+
+# If it still exists and is stuck due to finalizers (operator removed/failed), force-remove finalizers
+patch_finalizers_if_present tenant minio-cluster
+patch_finalizers_if_present tenants.minio.min.io minio-cluster
+
+helm delete minio-operator || true
+sleep 1
+
+helm delete db-cluster || true
+sleep 1
+
+# Percona: ensure the PXC CR is fully gone before removing the operator
+wait_gone "oc get pxc -n $project db-cluster" 5 || true
+wait_gone "oc get perconaxtradbclusters.pxc.percona.com -n $project db-cluster" 5 || true
+
+# If it still exists and is stuck due to finalizers (operator removed/failed), force-remove finalizers
+patch_finalizers_if_present pxc db-cluster
+patch_finalizers_if_present perconaxtradbclusters.pxc.percona.com db-cluster
+
+# After patching, give it a moment and re-check
+wait_gone "oc get pxc -n $project db-cluster" 5 || true
+wait_gone "oc get perconaxtradbclusters.pxc.percona.com -n $project db-cluster" 5 || true
+
+helm delete db-operator || true
+sleep 1
+
+# Finally, delete the project itself
+oc delete project "$project" --wait=false || true
+
+# Wait for deletion to complete
+if ! wait_project_deleted; then
+  echo
+  echo "Project '$project' is still present after waiting; attempting to remove project finalizers as a last resort."
+
+  # Last resort: remove project finalizers so the namespace can terminate
+  oc patch project "$project" --type=merge -p '{"spec":{"finalizers":[]}}' || true
+
+  # Wait again
+  wait_project_deleted || true
+fi
+
+# Best-effort check and message
+if oc get project "$project" >/dev/null 2>&1; then
+  echo
+  echo "Project '$project' still exists. Check blockers with:"
+  echo "  oc get project $project -o yaml | sed -n '1,200p'"
+  echo "  oc api-resources --namespaced -o name | while read r; do oc get \"$r\" -n $project --ignore-not-found; done"
+  exit 1
+fi
+
