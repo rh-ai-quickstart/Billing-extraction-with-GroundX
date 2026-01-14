@@ -52,7 +52,24 @@ delete-namespace: ## Delete the namespace (WARNING: This will delete all resourc
 		echo "Cancelled"; \
 	fi
 
+##@ Cluster configuration
+
+.PHONY: label-nodes
+label-nodes: ## Add node labels to the workers that groundx pods will use
+	echo "Labeling worker nodes"
+	oc label node -l node-role.kubernetes.io/worker node=eyelevel-node
+	echo ""
+	oc get nodes -L node
+	echo ""
+
+.PHONY: create-groundx-storageclass
+create-groundx-storageclass: ## Create a storage class in the namespace
+	echo "Creating a new storage class in the namespace"
+	helm upgrade --install groundx-storageclass groundx/groundx-storageclass -n $(NAMESPACE)
+	sleep 5
+
 ##@ Helm Chart Management
+
 .PHONY: clean-install
 clean-install: uninstall install ## Clean install the billing extraction demo environment
 
