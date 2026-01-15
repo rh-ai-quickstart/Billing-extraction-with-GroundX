@@ -15,6 +15,7 @@ ifndef KUBECTL
 	KUBECTL := kubectl
 	PLATFORM := kubernetes
 else
+    KUBECTL := oc
 	PLATFORM := openshift
 endif
 
@@ -28,15 +29,29 @@ help: ## Display this help message
 	@echo ""
 	@echo "Configuration:"
 	@echo "  NAMESPACE=$(NAMESPACE)"
-	@echo "  RELEASE_NAME=$(RELEASE_NAME)"
-	@echo "  VALUES_FILE=$(VALUES_FILE)"
+	@echo "  OCP_VALUES_FILE=$(VALUES_FILE)"
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Helm repo management
+
+.PHONY: add-helm-repos
+add-helm-repos: 
+    echo "Adding groundx helm repo"
+	helm repo add groundx https://registry.groundx.ai/helm
+
+    echo "Adding groundx percona repo"
+    helm repo add percona https://percona.github.io/percona-helm-charts/
+
+    echo "Adding groundx minio repo"
+    helm repo add minio-operator https://operator.min.io/
+
+    helm repo update
 
 ##@ Namespace Management
 
 .PHONY: create-namespace
-create-namespace: ## Create the namespace for fraud-detection
+create-namespace: add-helm-repos
 	@echo "Creating namespace: $(NAMESPACE)"
 	@$(KUBECTL) create namespace $(NAMESPACE) || echo "Namespace $(NAMESPACE) already exists"
 
@@ -52,46 +67,98 @@ delete-namespace: ## Delete the namespace (WARNING: This will delete all resourc
 		echo "Cancelled"; \
 	fi
 
-##@ Cluster configuration
-
-.PHONY: label-nodes
-label-nodes: ## Add node labels to the workers that groundx pods will use
-	echo "Labeling worker nodes"
-	oc label node -l node-role.kubernetes.io/worker node=eyelevel-node
-	echo ""
-	oc get nodes -L node
-	echo ""
-
-.PHONY: create-groundx-storageclass
-create-groundx-storageclass: ## Create a storage class in the namespace
-	echo "Creating a new storage class in the namespace"
-	helm upgrade --install groundx-storageclass groundx/groundx-storageclass -n $(NAMESPACE)
-	sleep 5
-
 ##@ Helm Chart Management
 
 .PHONY: clean-install
 clean-install: uninstall install ## Clean install the billing extraction demo environment
 
 .PHONY: install
-install: create-namespace ## Install the fraud-detection Helm chart
-	@echo "Installing $(RELEASE_NAME) in namespace $(NAMESPACE)..."
-	@if [ "$(PLATFORM)" = "openshift" ]; then \
-		echo "Using OpenShift values..."; \
-		helm install $(RELEASE_NAME) $(CHART_DIR) \
-			--namespace $(NAMESPACE) \
-			--values $(CHART_DIR)/$(OCP_VALUES_FILE) \
-			--wait \
-			--timeout $(TIMEOUT); \
+install: install-groundx ## Install the fraud-detection Helm chart
+	echo "Installation complete!"
+
+.PHONY: install-groundx
+install-groundx: install-strimzi-kafka
+	echo "Installing Groundx secret"
+    helm upgrade --install groundx-secret groundx/groundx-secret \
+        -f values/values.groundx.secret.yaml \
+        -n $(NAMESPACE)
+    sleep 1
+
+    echo "Installing Groundx"
+	helm upgrade --install groundx groundx/groundx \
+        -f values/values.groundx.yaml 
+        -n $(NAMESPACE)
+	sleep 5
+
+.PHONY: install-strimzi-kafka
+install-strimzi-kafka: install-minio
+	echo "Installing Strimzi Kafka operator"
+    helm upgrade --install stream-operator oci://quay.io/strimzi-helm/strimzi-kafka-operator \
+        -f values/values.strimzi.operator.yaml \
+        -n $(NAMESPACE)
+	sleep 5
+
+	echo "Installing Strimzi Kafka cluster"
+    helm upgrade --install stream-cluster groundx/groundx-strimzi-kafka-cluster \
+        -f values/values.strimzi.cluster.yaml \
+        -n $(NAMESPACE)
+	sleep 5
+
+.PHONY: install-minio
+install-minio: install-db-cluster
+    echo "Setting permissions of minio-operator and minio-tenant accounts"
+    oc adm policy add-scc-to-user anyuid -z minio-operator -n $project
+    oc adm policy add-scc-to-user anyuid -z minio-tenant-sa -n $project
+
+	echo "Installing Minio operator"
+    helm upgrade --install minio-operator minio-operator/operator \
+        -f values/values.minio.operator.yaml \
+        -n $(NAMESPACE)
+	sleep 5
+
+	echo "Installing Minio cluster"
+    helm upgrade --install minio-cluster minio-operator/tenant \
+        -f values/values.minio.tenant.yaml \
+        -n $(NAMESPACE)
+	sleep 5
+
+    @if [ "$(PLATFORM)" = "openshift" ]; then \
+		echo "Creating a route for Minio" \
+        oc expose svc/minio -n $(NAMESPACE) \
 	else \
-		echo "Using default Kubernetes values..."; \
-		helm install $(RELEASE_NAME) $(CHART_DIR) \
-			--namespace $(NAMESPACE) \
-			--values $(CHART_DIR)/$(K8S_VALUES_FILE) \
-			--wait \
-			--timeout $(TIMEOUT); \
+		echo "Routes are only available on OpenShift"; \
 	fi
-	@echo "Installation complete!"
+
+.PHONY: install-db-cluster
+install-db-cluster: create-groundx-storageclass
+	echo "Installing Percona for MySQL database operator"
+    helm upgrade --install db-operator percona/pxc-operator \
+        -f values/values.percona.operator.yaml \
+        -n $(NAMESPACE)
+	sleep 5
+
+	echo "Installing Percona for MySQL database cluster"
+    helm upgrade --install db-cluster percona/pxc-db \
+        -f values/values.percona.cluster.yaml \
+        -n $(NAMESPACE)
+	sleep 5
+
+##@ Cluster Preparation
+
+.PHONY: create-groundx-storageclass
+create-groundx-storageclass: label-nodes
+	echo "Creating a new storage class in the namespace"
+	helm upgrade --install groundx-storageclass groundx/groundx-storageclass -n $(NAMESPACE)
+	sleep 5
+
+.PHONY: label-nodes
+label-nodes: create-namespace
+	echo "Labeling worker nodes"
+	oc label node -l node-role.kubernetes.io/worker node=eyelevel-node
+	echo ""
+	oc get nodes -L node
+	echo ""
+
 
 .PHONY: uninstall 
 uninstall:
@@ -134,7 +201,7 @@ logs-minio: ## Show Kafka logs
 	@$(KUBECTL) logs -n $(NAMESPACE) -l app.kubernetes.io/component=kafka --tail=100 -f
 
 .PHONY: logs-percona
-logs-minio: ## Show Percona for MySQL logs
+logs-percona: ## Show Percona for MySQL logs
 	@$(KUBECTL) logs -n $(NAMESPACE) -l app.kubernetes.io/component=percona --tail=100 -f
 
 .PHONY: logs-notebook
