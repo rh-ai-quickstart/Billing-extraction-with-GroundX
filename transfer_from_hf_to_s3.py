@@ -20,38 +20,36 @@ def upload_dir_to_s3(local_dir, bucket, prefix, s3, dry_run=False):
             s3.upload_file(str(p), bucket, key)
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--repo", required=True, help="HF repo id, e.g. ibm-granite/granite-7b-instruct")
-    ap.add_argument("--bucket", required=True, help="S3 bucket name")
-    ap.add_argument("--prefix", required=True, help="S3 prefix/folder to place the snapshot")
-    ap.add_argument("--hf-token", dest="hf_token",
-                default=os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN"))
-    ap.add_argument("--endpoint", default=os.getenv("S3_ENDPOINT"), help="S3-compatible endpoint URL (omit for AWS)")
-    ap.add_argument("--region", default=os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
-    ap.add_argument("--access-key", default=os.getenv("AWS_ACCESS_KEY_ID"))
-    ap.add_argument("--secret-key", default=os.getenv("AWS_SECRET_ACCESS_KEY"))
-    ap.add_argument("--insecure", action="store_true", help="Skip TLS verify for self-signed MinIO")
-    ap.add_argument("--dry-run", action="store_true")
-    args = ap.parse_args()
+    hf_token = "REPLACE_WITH_YOUR_HF_TOKEN"
+    repo = "RedHatAI/gemma-3-12b-it-quantized.w4a16"
 
-    if args.hf_token:
-        login(args.hf_token)
+    s3_endpoint = os.environ.get('AWS_S3_ENDPOINT')
+    s3_region = os.environ.get('AWS_DEFAULT_REGION')
+    s3_access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+    s3_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    s3_bucket = os.environ.get('AWS_S3_BUCKET')
+    s3_path = "REPLACE_WITH_PATH_TO_MODEL"
+    insecure = "true"
+    dry_run = "false"
+    
+    if hf_token:
+        login(hf_token)
 
-    print(f"Downloading HF snapshot: {args.repo}")
-    local_path = snapshot_download(repo_id=args.repo)
+    print(f"Downloading HF snapshot: {repo}")
+    local_path = snapshot_download(repo)
     print("Downloaded to:", local_path)
 
-    session = boto3.session.Session(region_name=args.region)
+    session = boto3.session.Session(region_name=s3_region)
     s3 = session.client(
         "s3",
-        aws_access_key_id=args.access_key,
-        aws_secret_access_key=args.secret_key,
-        endpoint_url=args.endpoint or None,
+        aws_access_key_id=s3_access_key,
+        aws_secret_access_key=s3_secret_access_key,
+        endpoint_url=s3_endpoint or None,
         config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"})
     )
 
-    print(f"Uploading to s3://{args.bucket}/{args.prefix.rstrip('/')}/ …")
-    upload_dir_to_s3(local_path, args.bucket, args.prefix, s3, dry_run=args.dry_run)
+    print(f"Uploading to s3://{s3_bucket}/{s3_path.rstrip('/')}/ …")
+    upload_dir_to_s3(local_path, s3_bucket, s3_path, s3, dry_run=dry_run)
     print("Done.")
 
 if __name__ == "__main__":
