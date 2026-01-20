@@ -103,25 +103,64 @@ $ git clone https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.
 $ cd Billing-extraction-with-GroundX
 ```
 
+Set the API key in `values.groundx.secret.yaml`
+
 2. Login to the OpenShift cluster:
 ```
 $ oc login --token=<user_token> --server=https://api.<openshift_cluster_fqdn>:6443
 ```
 
-3. Make sure `setup` file is executable and run it, passing it the name of the project in which to install. It can be an existing or new project. In this example, it will deploy to the `lakefs` project.
+3. Make sure `setup` file is executable and run it, passing it the name of the project in which to install. Deploy to the `eyelevel` project.
 ```
 # Make script executable
 $ chmod + setup
 
 # Run script passing it the project in which to install
-$ ./setup
+$ ./setup eyelevel
 ```
+
+## Demo GroundX
+
+In OpenShift AI, create a workbench, following the steps below. You'll need your Hugging Face token to add to the environment variable.
+
+1. In OpenShift AI, enter into the `eyelevel` project
+2. Create a workbench
+   **Name**: groundx-wb
+   **Image selection**: Jupyter | Minimal | CPU | Python 3.12
+   **Version selection**: 2025.2
+   **Container size**: Small
+   **Accelerator**: None
+   Add an environment variable
+     **Type**: Secret --> Key / value
+     **Key**: HF_TOKEN
+     **Value**: YOUR_HUGGING_FACE_TOKEN
+   Click on **Create connection** button
+     Select **S3 compatible object storage**
+     **Connection name**: Models-Storage
+     **Access key**: minio
+     **Secret key**: minio123
+     **Endpoint** http://minio
+     **Region**: us-east-1
+     **Bucket**: models
+3. Click **Create notebook**
+
+Open the running notebook
+Clone the repo into the notebook
+Open the *Transfer_models** notebook
+Set the `s3_path` to RedHatAI/gemma-3
+
+   
+
 
 ### Delete
 
-The project the apps were installed in can be deleted, which will delete all of the resources in it.
+Run the `uninstall` script to delete the application and project.
 ```
-oc delete project eyelevel
+# Make script executable
+$ chmod + uninstall
+
+# Run script passing it the project in which to uninstall
+$ ./uninstall eyelevel
 ```
 
 ## References 
