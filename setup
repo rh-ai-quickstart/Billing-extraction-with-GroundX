@@ -25,7 +25,11 @@ error_and_exit () {
     echo
     echo "To clean up for another attempt, use:"
     echo
-    echo "oc delete project $1"
+    if [ -n "${1:-}" ]; then
+        echo "oc delete project $1"
+    else
+        echo "oc delete project <project_name>"
+    fi
     echo
     exit 1
 }
@@ -51,15 +55,15 @@ fi
 echo
 
 # Error function on ERR signal
-set -e # Exit immediately if a command exits with a non-zero status
-trap 'error_and_exit' ERR
+set -euo pipefail  # Exit on error, unset vars, and fail pipelines
+trap 'error_and_exit "$project"' ERR
 
 # install the groundx helm chart repo
-helm repo add groundx https://registry.groundx.ai/helm
+helm repo add groundx https://registry.groundx.ai/helm --force-update
 
 # install service dependency repos
-helm repo add percona https://percona.github.io/percona-helm-charts/
-helm repo add minio-operator https://operator.min.io/
+helm repo add percona https://percona.github.io/percona-helm-charts/ --force-update
+helm repo add minio-operator https://operator.min.io/ --force-update
 
 helm repo update
 
