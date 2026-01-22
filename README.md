@@ -16,10 +16,26 @@ When used with OpenShift AI on premises, customers can have complete control of 
 - [Deploy](#deploy)
   - [Pre-requisites](#pre-requisites)
   - [Deployment steps](#deployment-steps)
-  - [Delete](#delete)
+- [Demo GroundX](#demo-groundx)
+  - [Create storage bucket for models](#create-storage-bucket-for-models)
+  - [Create a new workbench in OpenShift AI](#create-a-new-workbench-in-openShift-ai)
+  - [Clone this repo](#clone-this-repo)
+  - [Copy the model to local storage](#copy-the-model-to-local-storage)
+  - [Create the model registry](#create-the-model-registry)
+  - [Add the model to the registry](#add-the-model-to-the-registry)
+  - [Deploy the model](#deploy-the-model)
+- [Delete](#delete)
+- [Demo GroundX](#demo-groundx)
 - [References](#references)
 - [Technical details](#technical-details)
 - [Tags](#tags)
+
+### Create-storage-bucket-for-models
+### create-a-new-workbench-in-openShift-ai
+### Copy the model to local storage
+### Create the model registry
+### Add the model to the registry
+### Deploy the model
 
 ## Detailed description
 
@@ -89,10 +105,11 @@ The steps assume the following pre-requisite products and components are deploye
 2. Red Hat OpenShift Service Mesh
 3. Red Hat OpenShift Serverless
 4. Red Hat OpenShift AI
-5. Node Feature Discovery operator
-6. Nvidia GPU operator
-7. User has `admin` permissions in the cluster
-8. The `eyelevel` project should not exist
+5. Red Hat Authorino
+6. Node Feature Discovery operator
+7. Nvidia GPU operator
+8. User has `admin` permissions in the cluster
+9. The `eyelevel` project should not exist
 
 ### Deployment Steps
 
@@ -123,7 +140,14 @@ $ ./setup eyelevel
 ```
 
 ## Demo GroundX
+The following steps walk through the demonstration.
 
+### Create storage bucket for models
+The model used for the demonstration will be copied from Hugging Face to the local Minio instance. For this, we'll create a `models` storage bucket.
+1. Use the Minio console route to access Minio's UI
+2. Create a storge bucket called `models`
+
+### Create a new workbench in OpenShift AI
 In OpenShift AI, create a workbench, following the steps below. You'll need your Hugging Face token to add to the environment variable.
 
 1. In OpenShift AI, enter into the `eyelevel` project
@@ -137,23 +161,46 @@ In OpenShift AI, create a workbench, following the steps below. You'll need your
      - **Type**: Secret --> Key / value
      - **Key**: HF_TOKEN
      - **Value**: YOUR_HUGGING_FACE_TOKEN
-   Click on **Create connection** button
-     Select **S3 compatible object storage**
-     **Connection name**: Models-Storage
-     **Access key**: minio
-     **Secret key**: minio123
-     **Endpoint** http://minio
-     **Region**: us-east-1
-     **Bucket**: models
+   - Click on **Create connection** button
+     - Select **S3 compatible object storage**
+    -  **Connection name**: Models-Storage
+    -  **Access key**: minio
+    -  **Secret key**: minio123
+    -  **Endpoint** http://minio
+    -  **Region**: us-east-1
+    -  **Bucket**: models
 3. Click **Create notebook**
 
-Open the running notebook
-Clone the repo into the notebook
-Open the *Transfer_models** notebook
-Set the `s3_path` to RedHatAI/gemma-3
+### Clone this repo
+1. Open the running workbench
+2. Clone this repo into the workbench
 
-   
+### Copy the model to local storage
+1. Open the **Transfer_models** notebook
+2. Set the `s3_path` to RedHatAI/gemma-3
+3. Save and run the notebook
 
+### Create the model registry
+1. From the OpenShift console's **Software Catalog**, search for the **MySQL** template
+2. Create an instance of **MySQL** using the template
+3. In the OpenShift AI dashboard, as an admin user, go to **Model Registry Settings**
+4. Create a new model registry using the newly deployed MySQL server
+
+### Add the model to the registry
+1. In the OpenShift AI dashboard, go to **Models**, the to **Model Registries**
+2. Select the model registry just created
+3. Click to register a new model
+4. Fill out the form with the information about the model stored in the `models` storage bucket in Minio
+
+### Deploy the model
+1. Enter into the `eyelevel` project
+2. On the **Models** tab, make sure a **Single Model Server** is running
+3. Deploy the model from the regsitry
+
+### Run the GroundX demo
+1. Open the **get_started** notebook
+2. Set the `s3_path` to RedHatAI/gemma-3
+3. Save and run the notebook
 
 ### Delete
 
