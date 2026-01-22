@@ -30,13 +30,6 @@ When used with OpenShift AI on premises, customers can have complete control of 
 - [Technical details](#technical-details)
 - [Tags](#tags)
 
-### Create-storage-bucket-for-models
-### create-a-new-workbench-in-openShift-ai
-### Copy the model to local storage
-### Create the model registry
-### Add the model to the registry
-### Deploy the model
-
 ## Detailed description
 
 This AI quickstart demonstrates how to use **GroundX** from **EyeLevel** for billing data extraction in an on-prem AI environment with OpenShift AI.
