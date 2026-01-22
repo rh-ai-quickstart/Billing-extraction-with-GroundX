@@ -138,8 +138,9 @@ helm upgrade --install groundx-secret \
 
 sleep 5
 
-# expose minio as a route
+# expose minio API and Console as routes
 oc expose svc/minio -n $project
+oc expose svc/minio-tenant-console -n $project
 
 sleep 5
 
