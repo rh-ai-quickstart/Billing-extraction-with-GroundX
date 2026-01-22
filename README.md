@@ -170,7 +170,7 @@ In OpenShift AI, create a workbench, following the steps below. You'll need your
 
 ### Copy the model to local storage
 1. Open the **Transfer_models** notebook
-2. Set the `s3_path` to RedHatAI/gemma-3
+2. Set the `s3_path` to RedHatAI/gemma-3-12b-it-quantized.w4a16
 3. Save and run the notebook
 
 ### Create the model registry
