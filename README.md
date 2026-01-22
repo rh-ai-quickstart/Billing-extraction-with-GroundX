@@ -104,6 +104,9 @@ $ cd Billing-extraction-with-GroundX
 ```
 
 Set the API key in `values.groundx.secret.yaml`
+```
+$ cp <secret_with_key>.yaml Billing-extraction-with-GroundX/values/values.groundx.secret.yaml
+```
 
 2. Login to the OpenShift cluster:
 ```
@@ -125,15 +128,15 @@ In OpenShift AI, create a workbench, following the steps below. You'll need your
 
 1. In OpenShift AI, enter into the `eyelevel` project
 2. Create a workbench
-   **Name**: groundx-wb
-   **Image selection**: Jupyter | Minimal | CPU | Python 3.12
-   **Version selection**: 2025.2
-   **Container size**: Small
-   **Accelerator**: None
-   Add an environment variable
-     **Type**: Secret --> Key / value
-     **Key**: HF_TOKEN
-     **Value**: YOUR_HUGGING_FACE_TOKEN
+   - **Name**: groundx-wb
+   - **Image selection**: Jupyter | Minimal | CPU | Python 3.12
+   - **Version selection**: 2025.2
+   - **Container size**: Small
+   - **Accelerator**: None
+   - Add an environment variable
+     - **Type**: Secret --> Key / value
+     - **Key**: HF_TOKEN
+     - **Value**: YOUR_HUGGING_FACE_TOKEN
    Click on **Create connection** button
      Select **S3 compatible object storage**
      **Connection name**: Models-Storage
