@@ -192,12 +192,14 @@ In OpenShift AI, create a workbench, following the steps below. You'll need your
 
 ### Run the GroundX demo
 1. Open the **get_started** notebook
-2. Set the `s3_path` to RedHatAI/gemma-3
+2. Pay special attention to the section `Initialize Client and Prompt Manager` as you'll need to set some variables, including the OpenShift route to the GroundX application as well as the GroundX API key if you have one.
 3. Save and run the notebook
 
-### Delete
+## Delete
 
-Run the `uninstall` script to delete the application and project.
+In order to delete the environment, you can take the following steps:
+1. Delete the workbench
+2. Use the `uninstall` script to delete the application and project.
 ```
 # Make script executable
 $ chmod + uninstall
@@ -205,6 +207,7 @@ $ chmod + uninstall
 # Run script passing it the project in which to uninstall
 $ ./uninstall eyelevel
 ```
+3. You can optionally remove the model from the registry and/or the model registry itself.
 
 ## References 
 
