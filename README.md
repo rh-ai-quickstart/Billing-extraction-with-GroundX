@@ -25,7 +25,6 @@ When used with OpenShift AI on premises, customers can have complete control of 
   - [Add the model to the registry](#add-the-model-to-the-registry)
   - [Deploy the model](#deploy-the-model)
 - [Delete](#delete)
-- [Demo GroundX](#demo-groundx)
 - [References](#references)
 - [Technical details](#technical-details)
 - [Tags](#tags)
