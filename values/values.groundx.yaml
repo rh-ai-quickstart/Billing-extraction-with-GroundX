@@ -22,20 +22,20 @@ cluster:
     gpuSummary: eyelevel-node
 
 file:
-  customDomain: minio-eyelevel.apps.23629ac0-eyelevelai.openshiftpartnerlabs.com
+  customDomain: minio-eyelevel.apps.98155a51-eyelevelai.openshiftpartnerlabs.com
 
 groundx:
   serviceType: Route
 
 engines:
   default:
-    engineId: gpt-5-mini
+    engineId: RedHatAI/Qwen2.5-VL-7B-Instruct-FP8-Dynamic
     reasoningEffort: low
     vision: true
 
 summary:
   existing:
-    # apiBaseUrl: https://api.openai.com/v1
+    url: https://qwen25-vl-7b-instruct-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com/v1
     serviceType: openai-base64
 
 extract:
@@ -44,7 +44,8 @@ extract:
   agent:
     enabled: true
 
-    # apiBaseUrl: https://api.openai.com/v1
+    modelId: RedHatAI/Qwen2.5-VL-7B-Instruct-FP8-Dynamic
+    apiBaseUrl: https://qwen25-vl-7b-instruct-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com/v1
     serviceType: openai
 
     resources:
