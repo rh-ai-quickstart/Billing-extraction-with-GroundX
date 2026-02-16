@@ -20,6 +20,7 @@ deleteProject: true
 # ---------------------------------------------------------------------------
 db-cluster:
   nameOverride: db-cluster
+  fullnameOverride: db-cluster
   backup:
     enabled: false
     nodeSelector:
