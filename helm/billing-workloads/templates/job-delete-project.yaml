@@ -1,0 +1,55 @@
+{{- if .Values.deleteProject }}
+{{/*
+Post-delete hook that removes the OpenShift project after all chart
+resources have been cleaned up.
+*/}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-delete-project
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+spec:
+  activeDeadlineSeconds: 600
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 60
+  template:
+    metadata:
+      labels:
+        {{- include "billing-workloads.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: delete-project
+    spec:
+      serviceAccountName: {{ include "billing-workloads.serviceAccountName" . }}
+      restartPolicy: Never
+      containers:
+        - name: delete-project
+          image: {{ .Values.job.image }}
+          env:
+            - name: HOME
+              value: /tmp
+          command:
+            - /bin/sh
+            - -c
+            - |
+              oc delete project "{{ .Release.Namespace }}" --wait=false || true
+
+              for i in $(seq 1 120); do
+                oc get project "{{ .Release.Namespace }}" >/dev/null 2>&1 || exit 0
+                sleep 5
+              done
+
+              echo "Project still present, removing finalizers..."
+              oc patch project "{{ .Release.Namespace }}" --type=merge -p '{"spec":{"finalizers":[]}}' || true
+
+              for i in $(seq 1 24); do
+                oc get project "{{ .Release.Namespace }}" >/dev/null 2>&1 || exit 0
+                sleep 5
+              done
+
+              echo "Project {{ .Release.Namespace }} still exists. Manual cleanup may be needed."
+{{- end }}

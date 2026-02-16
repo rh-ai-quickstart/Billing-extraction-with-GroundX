@@ -1,0 +1,21 @@
+Phase 1: Operators deployed to {{ .Release.Namespace }}
+=======================================================
+
+REMINDER: Install the NVIDIA GPU OPERATOR before deploying workloads!
+  https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/steps-overview.html
+
+Deployed:
+  - GroundX StorageClass
+  - Percona MySQL Operator   (db-operator)
+  - MinIO Operator            (minio-operator)
+  - Strimzi Kafka Operator    (stream-operator)
+  - SCC RoleBindings for MinIO
+  - Node labels: {{ .Values.nodeLabel.key }}={{ .Values.nodeLabel.value }}
+
+NEXT STEP: Wait for all operators to be ready, then install workloads:
+
+  oc get pods -n {{ .Release.Namespace }} -w
+
+  # Once all operator pods are Running:
+  helm dep update ./helm/billing-workloads
+  helm install billing-workloads ./helm/billing-workloads -n {{ .Release.Namespace }} --skip-crds

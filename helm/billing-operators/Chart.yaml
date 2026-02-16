@@ -1,0 +1,35 @@
+apiVersion: v2
+name: billing-operators
+description: "Phase 1: Operators and cluster prep for GroundX billing extraction"
+version: 0.1.0
+appVersion: "1.0.0"
+type: application
+
+dependencies:
+  # groundx/groundx-storageclass
+  - name: groundx-storageclass
+    repository: https://registry.groundx.ai/helm
+    version: "*"
+    condition: groundx-storageclass.enabled
+
+  # percona/pxc-operator  (release alias: db-operator)
+  - name: pxc-operator
+    alias: db-operator
+    repository: https://percona.github.io/percona-helm-charts/
+    version: "*"
+    condition: db-operator.enabled
+
+  # minio-operator/operator  (release alias: minio-operator)
+  - name: operator
+    alias: minio-operator
+    repository: https://operator.min.io/
+    version: "*"
+    condition: minio-operator.enabled
+
+  # oci://quay.io/strimzi-helm/strimzi-kafka-operator  (release alias: stream-operator)
+  # Set stream-operator.enabled=false if Strimzi is already installed (e.g. via OLM)
+  - name: strimzi-kafka-operator
+    alias: stream-operator
+    repository: oci://quay.io/strimzi-helm
+    version: "*"
+    condition: stream-operator.enabled

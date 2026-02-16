@@ -1,0 +1,194 @@
+# Phase 2: Cluster instances, secrets, and GroundX
+# Install this chart AFTER billing-operators is deployed and all operators are running.
+
+# Container image for cleanup hook Jobs
+job:
+  image: quay.io/openshift/origin-cli:latest
+
+# ServiceAccount used by cleanup hook Jobs
+serviceAccount:
+  create: true
+  name: ""
+  clusterRole: cluster-admin
+
+# Whether to delete the OpenShift project on helm uninstall
+deleteProject: true
+
+# ---------------------------------------------------------------------------
+# db-cluster  (alias for percona/pxc-db)
+# mirrors: values/values.percona.cluster.yaml
+# ---------------------------------------------------------------------------
+db-cluster:
+  nameOverride: db-cluster
+  backup:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  haproxy:
+    enabled: true
+    nodeSelector:
+      node: eyelevel-node
+    resources:
+      requests:
+        cpu: 600m
+        memory: 1Gi
+    size: 1
+  logcollector:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  nodeSelector:
+    node: eyelevel-node
+  pmm:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  proxysql:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  pxc:
+    nodeSelector:
+      node: eyelevel-node
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 600m
+        memory: 512Mi
+    size: 1
+  secrets:
+    passwords:
+      root: password
+      xtrabackup: password
+      monitor: password
+      clustercheck: password
+      proxyadmin: password
+      operator: password
+      replication: password
+  unsafeFlags:
+    pxcSize: true
+    proxySize: true
+
+# ---------------------------------------------------------------------------
+# minio-cluster  (alias for minio-operator/tenant)
+# mirrors: values/values.minio.tenant.yaml
+# ---------------------------------------------------------------------------
+minio-cluster:
+  tenant:
+    certificate:
+      requestAutoCert: false
+    configSecret:
+      accessKey: minio
+      secretKey: minio123
+    containerSecurityContext: null
+    name: minio-tenant
+    nodeSelector:
+      node: eyelevel-node
+    podSecurityContext: null
+    securityContext: null
+    pools:
+      - name: minio-tenant-pool-0
+        containerSecurityContext: null
+        nodeSelector:
+          node: eyelevel-node
+        podSecurityContext: null
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext: null
+        servers: 1
+        size: 20Gi
+        volumesPerServer: 1
+
+# ---------------------------------------------------------------------------
+# stream-cluster  (alias for groundx-strimzi-kafka-cluster)
+# mirrors: values/values.strimzi.cluster.yaml
+# ---------------------------------------------------------------------------
+stream-cluster:
+  node: eyelevel-node
+
+# ---------------------------------------------------------------------------
+# groundx-secret
+# mirrors: values/values.groundx.secret.yaml
+# ---------------------------------------------------------------------------
+groundx-secret:
+  name: eyelevel-secret-credentials
+  namespace: eyelevel
+  data:
+    GROUNDX_ADMIN_EMAIL: support@myco.net
+    GROUNDX_ADMIN_API_KEY: "00000000-0000-0000-0000-000000000001"
+    GROUNDX_ADMIN_PASSWORD: password
+    GROUNDX_ADMIN_USERNAME: "00000000-0000-0000-0000-000000000000"
+    GROUNDX_AGENT_API_KEY: LLM_API_KEY
+    GROUNDX_LICENSE_KEY: "00000000-0000-0000-0000-000000000002"
+    GROUNDX_ACCESS_KEY_ID: minio
+    GROUNDX_SECRET_ACCESS_KEY: minio123
+    MYSQL_INIT_PASSWORD: password
+    MYSQL_INIT_USER: root
+    MYSQL_USER: eyelevel
+    MYSQL_PASSWORD: password
+
+# ---------------------------------------------------------------------------
+# groundx
+# mirrors: values/values.groundx.yaml
+# ---------------------------------------------------------------------------
+groundx:
+  licenseKey: "00000000-0000-0000-0000-000000000000"
+  mode: ingest
+  cluster:
+    pvClass: eyelevel-pv
+    type: openshift
+    imagePullPolicy: Always
+    secrets:
+      - eyelevel-secret-credentials
+    preProcessors:
+      - processorId: 13
+        type: extract
+    nodeLabels:
+      cpuMemory: eyelevel-node
+      cpuOnly: eyelevel-node
+      gpuLayout: eyelevel-node
+      gpuRanker: eyelevel-node
+      gpuSummary: eyelevel-node
+  file:
+    customDomain: minio-eyelevel.apps.23629ac0-eyelevelai.openshiftpartnerlabs.com
+  groundx:
+    serviceType: Route
+  engines:
+    default:
+      engineId: gpt-5-mini
+      reasoningEffort: low
+      vision: true
+  summary:
+    existing:
+      serviceType: openai-base64
+  extract:
+    enabled: true
+    agent:
+      enabled: true
+      serviceType: openai
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+    api:
+      enabled: true
+      serviceType: Route
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+    download:
+      enabled: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+    save:
+      enabled: true
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi

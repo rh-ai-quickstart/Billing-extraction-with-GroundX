@@ -1,0 +1,15 @@
+dependencies:
+- name: groundx-storageclass
+  repository: https://registry.groundx.ai/helm
+  version: 0.1.0
+- name: pxc-operator
+  repository: https://percona.github.io/percona-helm-charts/
+  version: 1.19.0
+- name: operator
+  repository: https://operator.min.io/
+  version: 7.1.1
+- name: strimzi-kafka-operator
+  repository: oci://quay.io/strimzi-helm
+  version: 0.50.0
+digest: sha256:629f8088f1ee8626669b8d55c44033f7733f0bc421f54c022136c050ebd2a3bc
+generated: "2026-02-16T16:43:24.757687-05:00"

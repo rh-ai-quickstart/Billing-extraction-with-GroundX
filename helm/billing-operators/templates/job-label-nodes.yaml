@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "billing-operators.fullname" . }}-label-nodes
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-operators.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "billing-operators.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: label-nodes
+    spec:
+      serviceAccountName: {{ include "billing-operators.serviceAccountName" . }}
+      restartPolicy: Never
+      containers:
+        - name: label-nodes
+          image: {{ .Values.job.image }}
+          env:
+            - name: HOME
+              value: /tmp
+          command:
+            - oc
+            - label
+            - node
+            - -l
+            - node-role.kubernetes.io/worker
+            - {{ .Values.nodeLabel.key }}={{ .Values.nodeLabel.value }}
+            - --overwrite

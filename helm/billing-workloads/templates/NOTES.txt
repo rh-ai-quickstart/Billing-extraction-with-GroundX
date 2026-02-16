@@ -1,0 +1,32 @@
+Phase 2: Workloads deployed to {{ .Release.Namespace }}
+=======================================================
+
+Deployed:
+  - Percona MySQL Cluster     (db-cluster)
+  - MinIO Tenant              (minio-cluster)
+  - Strimzi Kafka Cluster     (stream-cluster)
+  - GroundX Secret
+  - GroundX
+  - MinIO Routes              (minio, minio-tenant-console)
+
+MONITOR:
+  oc get pods -n {{ .Release.Namespace }} -w
+
+VIEW ROUTES:
+  oc get routes -n {{ .Release.Namespace }}
+
+UNINSTALL (reverse order):
+
+  # 1. Remove workloads (pre-delete hook cleans up CRs gracefully)
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+  # 2. Remove operators
+  helm uninstall billing-operators -n {{ .Release.Namespace }}
+
+{{- if .Values.deleteProject }}
+  NOTE: The workloads uninstall will also delete the project "{{ .Release.Namespace }}".
+        Set deleteProject=false to skip project deletion.
+{{- else }}
+  # 3. (Optional) Delete the project
+  oc delete project {{ .Release.Namespace }}
+{{- end }}

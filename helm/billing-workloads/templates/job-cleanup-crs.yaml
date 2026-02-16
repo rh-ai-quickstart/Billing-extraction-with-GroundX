@@ -1,0 +1,72 @@
+{{/*
+Pre-delete hook that gracefully removes Custom Resources before Helm
+deletes the chart resources. This prevents stuck finalizers by ensuring
+operators can process CR deletion while they are still running.
+
+Mirrors the CR cleanup logic from the original uninstall script.
+*/}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-cleanup-crs
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 900
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "billing-workloads.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: cleanup-crs
+    spec:
+      serviceAccountName: {{ include "billing-workloads.serviceAccountName" . }}
+      restartPolicy: Never
+      containers:
+        - name: cleanup
+          image: {{ .Values.job.image }}
+          env:
+            - name: HOME
+              value: /tmp
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              patch_finalizers() {
+                oc get "$1" -n "$NAMESPACE" "$2" >/dev/null 2>&1 && \
+                  oc patch "$1" -n "$NAMESPACE" "$2" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
+              }
+              wait_deleted() {
+                for i in $(seq 1 60); do
+                  oc get "$1" -n "$NAMESPACE" "$2" >/dev/null 2>&1 || return 0
+                  sleep 5
+                done
+                return 1
+              }
+
+              echo "Deleting Kafka CR..."
+              oc delete kafka --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
+              wait_deleted kafka stream-cluster || patch_finalizers kafka stream-cluster
+              wait_deleted kafkas.kafka.strimzi.io stream-cluster || patch_finalizers kafkas.kafka.strimzi.io stream-cluster
+
+              echo "Deleting MinIO Tenant CR..."
+              oc delete tenant --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
+              wait_deleted tenant minio-cluster || patch_finalizers tenant minio-cluster
+              wait_deleted tenants.minio.min.io minio-cluster || patch_finalizers tenants.minio.min.io minio-cluster
+
+              echo "Deleting Percona PXC CR..."
+              oc delete pxc --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
+              wait_deleted pxc db-cluster || patch_finalizers pxc db-cluster
+              wait_deleted perconaxtradbclusters.pxc.percona.com db-cluster || patch_finalizers perconaxtradbclusters.pxc.percona.com db-cluster
+              wait_deleted pxc db-cluster || true
+              wait_deleted perconaxtradbclusters.pxc.percona.com db-cluster || true
+
+              echo "CR cleanup complete."

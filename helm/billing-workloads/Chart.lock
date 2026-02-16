@@ -1,0 +1,18 @@
+dependencies:
+- name: pxc-db
+  repository: https://percona.github.io/percona-helm-charts/
+  version: 1.19.0
+- name: tenant
+  repository: https://operator.min.io/
+  version: 7.1.1
+- name: groundx-strimzi-kafka-cluster
+  repository: https://registry.groundx.ai/helm
+  version: 0.1.1
+- name: groundx-secret
+  repository: https://registry.groundx.ai/helm
+  version: 0.1.0
+- name: groundx
+  repository: https://registry.groundx.ai/helm
+  version: 0.2.2
+digest: sha256:042f0e74fbab651d67b2495d3059244a4ce24806ddc957e5c98719a92e5a00ee
+generated: "2026-02-16T16:52:04.123588-05:00"

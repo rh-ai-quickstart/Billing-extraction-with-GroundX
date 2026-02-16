@@ -1,0 +1,17 @@
+{{/*
+Declarative equivalent of:
+  oc expose svc/minio -n $project
+*/}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: minio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+spec:
+  to:
+    kind: Service
+    name: minio
+    weight: 100
+  wildcardPolicy: None

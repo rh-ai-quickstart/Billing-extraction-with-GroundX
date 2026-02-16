@@ -1,0 +1,60 @@
+# Phase 1: Operators and cluster preparation
+# Install this chart FIRST, then install billing-workloads after operators are ready.
+
+# Node label applied to OpenShift workers for GroundX pod scheduling
+nodeLabel:
+  key: node
+  value: eyelevel-node
+
+# Container image for the node-labeling hook Job
+job:
+  image: quay.io/openshift/origin-cli:latest
+
+# ServiceAccount used by the node-labeling hook Job
+serviceAccount:
+  create: true
+  name: ""
+  clusterRole: cluster-admin
+
+# ---------------------------------------------------------------------------
+# groundx-storageclass  (no custom values needed)
+# Set enabled=false if the storageclass already exists on the cluster
+# ---------------------------------------------------------------------------
+groundx-storageclass:
+  enabled: true
+
+# ---------------------------------------------------------------------------
+# db-operator  (alias for percona/pxc-operator)
+# mirrors: values/values.percona.operator.yaml
+# Set enabled=false if Percona operator is already installed (e.g. via OLM)
+# ---------------------------------------------------------------------------
+db-operator:
+  enabled: true
+  nameOverride: db-operator
+  nodeSelector:
+    node: eyelevel-node
+
+# ---------------------------------------------------------------------------
+# minio-operator  (alias for minio-operator/operator)
+# mirrors: values/values.minio.operator.yaml
+# Set enabled=false if MinIO operator is already installed (e.g. via OLM)
+# ---------------------------------------------------------------------------
+minio-operator:
+  enabled: true
+  operator:
+    nodeSelector:
+      node: eyelevel-node
+    replicaCount: 1
+    containerSecurityContext: null
+    securityContext: null
+
+# ---------------------------------------------------------------------------
+# stream-operator  (alias for strimzi-kafka-operator)
+# mirrors: values/values.strimzi.operator.yaml
+# Set enabled=false if Strimzi is already installed (e.g. via OLM)
+# ---------------------------------------------------------------------------
+stream-operator:
+  enabled: true
+  nodeSelector:
+    node: eyelevel-node
+  replicas: 1
