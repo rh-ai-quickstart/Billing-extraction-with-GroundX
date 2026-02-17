@@ -151,8 +151,13 @@ In OpenShift AI, create a workbench, following the steps below. You'll need your
    - **Accelerator**: None
    - Add an environment variable
      - **Type**: Secret --> Key / value
-     - **Key**: HF_TOKEN
-     - **Value**: YOUR_HUGGING_FACE_TOKEN
+       - **Key**: HF_TOKEN
+       - **Value**: <YOUR_HUGGING_FACE_TOKEN>
+       - **Key**: GROUNDX_ADMIN_API_KEY
+       - **Value**: <YOUR_GROUNDX_ADMIN_API_KEY>
+     - **Type**: ConfigMap --> Key / value
+       - **Key**: GROUNDX_BASE_URL
+       - **Value**: <GROUNDX_OPENSHIFT_ROUTE>/api
    - Click on **Create connection** button
      - Select **S3 compatible object storage**
     -  **Connection name**: Models-Storage
