@@ -10,6 +10,8 @@ metadata:
   labels:
     {{- include "billing-workloads.labels" . | nindent 4 }}
 spec:
+  port:
+    targetPort: http-console
   to:
     kind: Service
     name: minio-tenant-console

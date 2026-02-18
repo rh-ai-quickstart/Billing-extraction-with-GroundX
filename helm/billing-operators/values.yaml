@@ -54,7 +54,7 @@ minio-operator:
 # Set enabled=false if Strimzi is already installed (e.g. via OLM)
 # ---------------------------------------------------------------------------
 stream-operator:
-  enabled: true
+  enabled: false
   nodeSelector:
     node: eyelevel-node
   replicas: 1

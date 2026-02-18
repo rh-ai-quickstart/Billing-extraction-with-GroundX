@@ -52,6 +52,10 @@ spec:
                 return 1
               }
 
+              echo "Deleting GroundX deployments..."
+              oc delete deployment --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
+              sleep 5
+
               echo "Deleting Kafka CR..."
               oc delete kafka --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
               wait_deleted kafka stream-cluster || patch_finalizers kafka stream-cluster

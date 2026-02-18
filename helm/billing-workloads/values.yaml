@@ -109,6 +109,10 @@ minio-cluster:
 # ---------------------------------------------------------------------------
 stream-cluster:
   node: eyelevel-node
+  enabled: true
+  cluster:
+    version: 4.1.0  # Strimzi operator supports [4.0.0, 4.1.0]
+    metaVersion: "4.1"
 
 # ---------------------------------------------------------------------------
 # groundx-secret
@@ -144,9 +148,6 @@ groundx:
     imagePullPolicy: Always
     secrets:
       - eyelevel-secret-credentials
-    preProcessors:
-      - processorId: 13
-        type: extract
     nodeLabels:
       cpuMemory: eyelevel-node
       cpuOnly: eyelevel-node
@@ -154,21 +155,29 @@ groundx:
       gpuRanker: eyelevel-node
       gpuSummary: eyelevel-node
   file:
-    customDomain: minio-eyelevel.apps.23629ac0-eyelevelai.openshiftpartnerlabs.com
+    customDomain: minio-eyelevel.apps.ai-dev02.kni.syseng.devcluster.openshift.com
   groundx:
     serviceType: Route
   engines:
     default:
-      engineId: gpt-5-mini
+      engineId: RedHatAI/llama-3-2-3b
       reasoningEffort: low
       vision: true
   summary:
     existing:
       serviceType: openai-base64
+  # Disable layout inference (GPU) so ingest can schedule without GPU nodes.
+  layout:
+    inference:
+      enabled: false
   extract:
     enabled: true
     agent:
+      replicas: 
+        desired: 1
       enabled: true
+      modelId: RedHatAI/llama-3-2-3b
+      apiBaseUrl: https://llama-3-2-3b-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
       serviceType: openai
       resources:
         requests:
