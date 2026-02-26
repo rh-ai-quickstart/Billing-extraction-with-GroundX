@@ -1,0 +1,32 @@
+{{- if and .Values.notebook.enabled .Values.global.openshift }}
+{{/*
+Grants the anyuid SCC to the per-notebook ServiceAccount that the Notebook
+controller auto-creates (named identically to the Notebook CR).  Some RHOAI
+notebook images require running as a specific UID; without this the pod may
+fail to start.
+
+Declarative equivalent of:
+  oc adm policy add-scc-to-user anyuid -z <notebook-name> -n <namespace>
+
+Note: this RoleBinding may be applied before the SA exists — OpenShift will
+accept a dangling subject and honour it once the controller creates the SA.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-notebook-anyuid
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notebook
+  annotations:
+    helm.sh/hook-weight: "-10"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "billing-workloads.fullname" . }}-notebook
+    namespace: {{ .Release.Namespace }}
+{{- end }}

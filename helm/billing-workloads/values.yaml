@@ -14,6 +14,8 @@ llm-service:
 # Models deployed by llm-service. Merged with chart defaults; only enabled models are deployed.
 # See: https://github.com/rh-ai-quickstart/ai-architecture-charts/blob/main/llm-service/helm/values.yaml
 global:
+  # Set to true when deploying on OpenShift / OpenShift AI
+  openshift: true
   models:
     gemma-3-12b-it:
       id: google/gemma-3-12b-it
@@ -279,4 +281,61 @@ groundx:
         requests:
           cpu: 1
           memory: 1Gi
+
+# ---------------------------------------------------------------------------
+# notebook – OpenShift AI Workbench (Jupyter Notebook)
+# Deploys a kubeflow.org/v1 Notebook CR on OpenShift AI.
+# Requires global.openshift: true to create OpenShift-specific resources.
+# ---------------------------------------------------------------------------
+notebook:
+  enabled: true
+
+  # Username that owns the workbench in OpenShift AI.
+  # Must match your cluster identity (oc whoami), e.g. rjjohnso@redhat.com
+  username: "rjjohnso@redhat.com"
+
+  # Notebook container image
+  # Use an image stream tag from the OpenShift internal registry, e.g.:
+  #   image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/tensorflow:2025.2
+  image:
+    repository: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/s2i-minimal-notebook
+    tag: "2025.2"
+    pullPolicy: Always
+
+  # CPU / memory for the notebook pod
+  resources:
+    limits:
+      cpu: "2"
+      memory: "8Gi"
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+
+  # Persistent workspace volume
+  storage:
+    size: 20Gi
+    storageClassName: ""   # Leave blank to use the cluster default StorageClass
+
+  # Shared memory volume (useful for large model inference inside the notebook)
+  shm:
+    enabled: true
+    size: 2Gi
+
+  # GroundX connection – injected as env vars into the notebook container
+  groundx:
+    apiKey: ""            # Set to your GroundX API key
+    endpoint: ""          # e.g. https://api.groundx.ai/api/v1
+
+  # MinIO / S3 connection – injected as env vars and used for the data connection Secret
+  minio:
+    accessKey: "minio"
+    secretKey: "minio123"
+    endpoint: ""          # e.g. https://minio-api-<namespace>.apps.<cluster-domain>
+    region: "us-east-1"
+    defaultBucket: "billing-artifacts"
+
+  # OpenShift AI data connection Secrets (s3-type) visible in the RHOAI dashboard
+  openshiftAI:
+    dataConnections:
+      enabled: true
 

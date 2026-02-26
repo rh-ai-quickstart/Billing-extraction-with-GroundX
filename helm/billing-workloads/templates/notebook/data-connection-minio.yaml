@@ -1,0 +1,22 @@
+{{- if and .Values.notebook.enabled .Values.global.openshift .Values.notebook.openshiftAI.dataConnections.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: billing-minio-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notebook
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/managed: "true"
+  annotations:
+    opendatahub.io/connection-type: "s3"
+    openshift.io/display-name: "billing-minio-storage"
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: {{ .Values.notebook.minio.accessKey | quote }}
+  AWS_SECRET_ACCESS_KEY: {{ .Values.notebook.minio.secretKey | quote }}
+  AWS_S3_ENDPOINT: {{ .Values.notebook.minio.endpoint | quote }}
+  AWS_DEFAULT_REGION: {{ .Values.notebook.minio.region | default "us-east-1" | quote }}
+  AWS_S3_BUCKET: {{ .Values.notebook.minio.defaultBucket | default "billing-artifacts" | quote }}
+{{- end }}
