@@ -1,0 +1,19 @@
+{{/*
+MinIO S3 API route. The MinIO Operator names the S3 API service 'minio' (not the
+tenant name). Service name and targetPort are driven by values.yaml minio.api keys.
+*/}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: minio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+spec:
+  port:
+    targetPort: {{ .Values.minio.api.targetPort | default "http-minio" }}
+  to:
+    kind: Service
+    name: {{ .Values.minio.api.serviceName | default "minio-tenant" }}
+    weight: 100
+  wildcardPolicy: None

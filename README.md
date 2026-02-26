@@ -220,6 +220,16 @@ $ ./uninstall eyelevel
 
 ## Technical details
 
+### Deploying Gemma 3 12B via LLM service (optional)
+
+The chart can deploy **google/gemma-3-12b-it** using the [llm-service](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/llm-service) from the ai-architecture-charts repo (same pattern as the [RAG](https://github.com/rh-ai-quickstart/RAG) blueprint).
+
+- **Enable**: In `helm/billing-workloads/values.yaml`, `llm-service.enabled` is `true` by default and `global.models.gemma-3-12b-it` is configured.
+- **Requirements**: Nodes with NVIDIA GPUs (e.g. `nvidia.com/gpu`); the model uses the default GPU device and tolerations from the llm-service chart.
+- **Hugging Face token**: If the model is gated, set `llm-service.secret.hf_token` (e.g. via a values override or sealed secret).
+- **Use with GroundX**: After deploy, the model is exposed as a KServe InferenceService. To use it for GroundX extract, set the extract agent to your cluster’s endpoint for the `gemma-3-12b-it` predictor (e.g. the OpenShift route or internal URL such as `http://gemma-3-12b-it-predictor.<namespace>.svc.cluster.local/v1`), and set `modelId` to the served model name (e.g. `google/gemma-3-12b-it`).
+
+To disable the LLM service and Gemma deployment, set `llm-service.enabled: false` in values.
 
 ## Tags
 

@@ -1,0 +1,282 @@
+# Phase 2: Cluster instances, secrets, and GroundX
+# Install this chart AFTER billing-operators is deployed and all operators are running.
+
+# ---------------------------------------------------------------------------
+# llm-service  (ai-architecture-charts) – deploys vLLM models e.g. Gemma 3 12B
+# Set llm-service.enabled to true and configure global.models below.
+# ---------------------------------------------------------------------------
+llm-service:
+  enabled: true
+  secret:
+    hf_token: ""   # Optional: set for gated Hugging Face models (e.g. some Gemma variants)
+    enabled: true
+
+# Models deployed by llm-service. Merged with chart defaults; only enabled models are deployed.
+# See: https://github.com/rh-ai-quickstart/ai-architecture-charts/blob/main/llm-service/helm/values.yaml
+global:
+  models:
+    gemma-3-12b-it:
+      id: google/gemma-3-12b-it
+      enabled: true
+      device: gpu
+      # Match GPU node taints used in this cluster (p4-gpu, g5-gpu, g5-small-gpu)
+      tolerations:
+        - key: g5-gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: g5-small-gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: p4-gpu
+          operator: Exists
+          effect: NoSchedule
+      resources:
+        limits:
+          cpu: "2"
+          memory: 32Gi
+        requests:
+          cpu: "1"
+          memory: 16Gi
+      args:
+        - --max-model-len
+        - "8192"
+        - --max-num-seqs
+        - "32"
+
+# Container image for cleanup hook Jobs
+job:
+  image: quay.io/openshift/origin-cli:latest
+
+# MinIO Route targets.
+# MinIO Operator v7 creates (confirmed via: oc get svc -n eyelevel | grep minio):
+#   minio                  ClusterIP  port 80   (named: http-minio)   → S3 API
+#   minio-tenant-console   ClusterIP  port 9090 (named: http-console) → Console UI
+#   minio-tenant-hl        ClusterIP  None (headless, internal only)
+# NOTE: the API service is 'minio' (not 'minio-tenant'); console port is 9090 (not 9001).
+minio:
+  api:
+    serviceName: minio
+    targetPort: http-minio
+  console:
+    serviceName: minio-tenant-console
+    targetPort: http-console
+
+# ServiceAccount used by cleanup hook Jobs
+serviceAccount:
+  create: true
+  name: ""
+  clusterRole: cluster-admin
+
+# Whether to delete the OpenShift project on helm uninstall
+deleteProject: true
+
+logLevel: debug
+# ---------------------------------------------------------------------------
+# db-cluster  (alias for percona/pxc-db)
+# mirrors: values/values.percona.cluster.yaml
+# ---------------------------------------------------------------------------
+db-cluster:
+  nameOverride: db-cluster
+  fullnameOverride: db-cluster
+  backup:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  haproxy:
+    enabled: true
+    nodeSelector:
+      node: eyelevel-node
+    resources:
+      requests:
+        cpu: 600m
+        memory: 1Gi
+    size: 1
+  logcollector:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  nodeSelector:
+    node: eyelevel-node
+  pmm:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  proxysql:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  pxc:
+    nodeSelector:
+      node: eyelevel-node
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 600m
+        memory: 512Mi
+    size: 1
+  secrets:
+    passwords:
+      root: password
+      xtrabackup: password
+      monitor: password
+      clustercheck: password
+      proxyadmin: password
+      operator: password
+      replication: password
+  unsafeFlags:
+    pxcSize: true
+    proxySize: true
+
+# ---------------------------------------------------------------------------
+# minio-cluster  (alias for minio-operator/tenant)
+# mirrors: values/values.minio.tenant.yaml
+# ---------------------------------------------------------------------------
+minio-cluster:
+  tenant:
+    certificate:
+      requestAutoCert: false
+    configSecret:
+      accessKey: minio
+      secretKey: minio123
+    containerSecurityContext: null
+    name: minio-tenant
+    nodeSelector:
+      node: eyelevel-node
+    podSecurityContext: null
+    securityContext: null
+    pools:
+      - name: minio-tenant-pool-0
+        containerSecurityContext: null
+        nodeSelector:
+          node: eyelevel-node
+        podSecurityContext: null
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext: null
+        servers: 1
+        size: 20Gi
+        storageClassName: eyelevel-pv
+        volumesPerServer: 1
+
+# ---------------------------------------------------------------------------
+# stream-cluster  (alias for groundx-strimzi-kafka-cluster)
+# mirrors: values/values.strimzi.cluster.yaml
+# ---------------------------------------------------------------------------
+stream-cluster:
+  node: eyelevel-node
+  enabled: true
+  cluster:
+    version: 4.1.0  # Strimzi operator supports [4.0.0, 4.1.0]
+    metaVersion: "4.1"
+
+# ---------------------------------------------------------------------------
+# groundx-secret
+# mirrors: values/values.groundx.secret.yaml
+# ---------------------------------------------------------------------------
+groundx-secret:
+  name: eyelevel-secret-credentials
+  namespace: eyelevel
+  data:
+    GROUNDX_ADMIN_EMAIL: support@myco.net
+    GROUNDX_ADMIN_API_KEY: "00000000-0000-0000-0000-000000000001"
+    GROUNDX_ADMIN_PASSWORD: password
+    GROUNDX_ADMIN_USERNAME: "00000000-0000-0000-0000-000000000000"
+    GROUNDX_AGENT_API_KEY: LLM_API_KEY
+    GROUNDX_LICENSE_KEY: "00000000-0000-0000-0000-000000000002"
+    GROUNDX_ACCESS_KEY_ID: minio
+    GROUNDX_SECRET_ACCESS_KEY: minio123
+    MYSQL_INIT_PASSWORD: password
+    MYSQL_INIT_USER: root
+    MYSQL_USER: eyelevel
+    MYSQL_PASSWORD: password
+
+# ---------------------------------------------------------------------------
+# groundx
+# mirrors: values/values.groundx.yaml
+# ---------------------------------------------------------------------------
+groundx:
+  licenseKey: "00000000-0000-0000-0000-000000000000"
+  mode: ingest
+  cluster:
+    pvClass: eyelevel-pv
+    type: openshift
+    imagePullPolicy: Always
+    secrets:
+      - eyelevel-secret-credentials
+    preProcessors:
+      - processorId: 13
+        type: extract
+    nodeLabels:
+      cpuMemory: eyelevel-node
+      cpuOnly: eyelevel-node
+      gpuLayout: eyelevel-node
+      gpuRanker: eyelevel-node
+      gpuSummary: eyelevel-node
+  file:
+    customDomain: minio-eyelevel.apps.ai-dev02.kni.syseng.devcluster.openshift.com
+  groundx:
+    serviceType: Route
+  engines:
+    default:
+      engineId: google/gemma-3-12b-it
+      reasoningEffort: low
+      vision: false
+  summary:
+    existing:
+      serviceType: openai-base64
+  layout:
+    inference:
+      enabled: true
+      tolerations:
+        - key: g5-gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: g5-small-gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: p4-gpu
+          operator: Exists
+          effect: NoSchedule
+    api:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+  extract:
+    enabled: true
+    agent:
+      replicas:
+        desired: 1
+      enabled: true
+      # To use the deployed Gemma 3 12B from llm-service, set modelId to "google/gemma-3-12b-it"
+      # and apiBaseUrl to the gemma-3-12b-it predictor URL (e.g. route or http://gemma-3-12b-it-predictor.<namespace>.svc.cluster.local/v1).
+      modelId: google/gemma-3-12b-it
+      apiBaseUrl: http://gemma-3-12b-it-predictor.eyelevel.svc.cluster.local:8080/v1
+      serviceType: openai
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+    api:
+      enabled: true
+      serviceType: Route
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    download:
+      enabled: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+    save:
+      enabled: true
+      resources:
+        requests:
+          cpu: 1
+          memory: 1Gi
+
