@@ -22,6 +22,8 @@ serviceAccount:
 # ---------------------------------------------------------------------------
 groundx-storageclass:
   enabled: true
+  # Do not modify cluster-wide default StorageClass
+  isDefaultClass: false
 
 # ---------------------------------------------------------------------------
 # db-operator  (alias for percona/pxc-operator)
