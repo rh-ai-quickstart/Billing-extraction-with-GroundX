@@ -294,6 +294,16 @@ notebook:
   # Must match your cluster identity (oc whoami), e.g. rjjohnso@redhat.com
   username: "rjjohnso@redhat.com"
 
+  # Security context defaults for notebook PVC writeability.
+  # These values align with common OpenShift AI notebook images.
+  podSecurityContext:
+    fsGroup: 1001
+    fsGroupChangePolicy: "OnRootMismatch"
+  containerSecurityContext:
+    runAsUser: 1001
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+
   # Notebook container image
   # Use an image stream tag from the OpenShift internal registry, e.g.:
   #   image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/tensorflow:2025.2
@@ -338,4 +348,20 @@ notebook:
   openshiftAI:
     dataConnections:
       enabled: true
+
+  # Optional one-shot git clone into notebook PVC after the notebook is Ready.
+  gitClone:
+    enabled: false
+    repository: "https://github.com/johnson2500/Billing-extraction-with-GroundX.git"
+    revision: "main"      # branch, tag, or commit SHA
+    targetDir: "Billing-extraction-with-GroundX"
+    depth: 1
+    waitTimeoutSeconds: 900
+    image:
+      repository: alpine/git
+      tag: "2.47.2"
+      pullPolicy: IfNotPresent
+    # If true and targetDir already has a git repo, hard-reset to revision.
+    # If false, existing clone is left unchanged.
+    forceReset: false
 

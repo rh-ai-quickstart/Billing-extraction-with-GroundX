@@ -1,0 +1,103 @@
+{{- if and .Values.notebook.enabled .Values.global.openshift .Values.notebook.gitClone.enabled }}
+{{- $repo := required "notebook.gitClone.repository is required when notebook.gitClone.enabled=true" .Values.notebook.gitClone.repository }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-notebook-git-clone
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notebook-git-clone
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "20"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: {{ .Values.notebook.gitClone.waitTimeoutSeconds | default 900 | int }}
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "billing-workloads.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: notebook-git-clone
+    spec:
+      serviceAccountName: {{ include "billing-workloads.serviceAccountName" . }}
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-notebook-ready
+          image: {{ .Values.job.image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: HOME
+              value: /tmp
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: NOTEBOOK_NAME
+              value: {{ include "billing-workloads.fullname" . }}-notebook
+            - name: WAIT_TIMEOUT_SECONDS
+              value: {{ .Values.notebook.gitClone.waitTimeoutSeconds | default 900 | int | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              i=0
+              while [ "$i" -lt "$WAIT_TIMEOUT_SECONDS" ]; do
+                POD="$(oc get pod -n "$NAMESPACE" -l "notebook-name=$NOTEBOOK_NAME" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+                if [ -n "$POD" ]; then
+                  READY="$(oc get pod "$POD" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
+                  if [ "$READY" = "True" ]; then
+                    echo "Notebook pod $POD is Ready."
+                    exit 0
+                  fi
+                fi
+                i=$((i + 1))
+                sleep 1
+              done
+              echo "Timed out waiting for notebook pod readiness."
+              exit 1
+      containers:
+        - name: git-clone
+          image: {{ .Values.notebook.gitClone.image.repository }}:{{ .Values.notebook.gitClone.image.tag }}
+          imagePullPolicy: {{ .Values.notebook.gitClone.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              DEST="/opt/app-root/src/{{ .Values.notebook.gitClone.targetDir }}"
+              REV="{{ .Values.notebook.gitClone.revision }}"
+              REPO="{{ $repo }}"
+              DEPTH="{{ .Values.notebook.gitClone.depth | default 1 }}"
+              FORCE_RESET="{{ .Values.notebook.gitClone.forceReset | default false }}"
+
+              mkdir -p /opt/app-root/src
+              if [ -d "$DEST/.git" ]; then
+                if [ "$FORCE_RESET" = "true" ]; then
+                  echo "Existing repo found at $DEST, resetting to $REV"
+                  git -C "$DEST" fetch origin "$REV" --depth "$DEPTH" || git -C "$DEST" fetch origin "$REV"
+                  git -C "$DEST" checkout "$REV" || git -C "$DEST" checkout -B "$REV" "origin/$REV"
+                  git -C "$DEST" reset --hard "FETCH_HEAD"
+                  exit 0
+                fi
+                echo "Existing git repo found at $DEST, skipping clone."
+                exit 0
+              fi
+
+              if [ "$(dirname "$DEST")" != "." ]; then
+                mkdir -p "$(dirname "$DEST")"
+              fi
+              if [ "$DEPTH" -gt 0 ] 2>/dev/null; then
+                git clone --depth "$DEPTH" --branch "$REV" "$REPO" "$DEST"
+              else
+                git clone --branch "$REV" "$REPO" "$DEST"
+              fi
+          volumeMounts:
+            - name: {{ include "billing-workloads.fullname" . }}-notebook-storage
+              mountPath: /opt/app-root/src/
+      volumes:
+        - name: {{ include "billing-workloads.fullname" . }}-notebook-storage
+          persistentVolumeClaim:
+            claimName: {{ include "billing-workloads.fullname" . }}-notebook-pvc
+{{- end }}

@@ -10,7 +10,7 @@ metadata:
     opendatahub.io/dashboard: "true"
     opendatahub.io/odh-managed: "true"
   annotations:
-    notebooks.opendatahub.io/inject-oauth: "true"
+    notebooks.opendatahub.io/inject-auth: "true"
     opendatahub.io/username: {{ .Values.notebook.username | default "admin" | quote }}
     opendatahub.io/notebook-image: "{{ .Values.notebook.image.repository }}:{{ .Values.notebook.image.tag }}"
 spec:
@@ -19,11 +19,19 @@ spec:
       # No serviceAccountName — the notebook controller creates a per-notebook SA
       # which is required for kube-rbac-proxy injection to work correctly.
       enableServiceLinks: false
+      {{- with .Values.notebook.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: {{ include "billing-workloads.fullname" . }}-notebook
         image: {{ .Values.notebook.image.repository }}:{{ .Values.notebook.image.tag }}
         imagePullPolicy: Always
         workingDir: /opt/app-root/src
+        {{- with .Values.notebook.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         {{- if .Values.notebook.openshiftAI.dataConnections.enabled }}
         envFrom:
         - secretRef:
@@ -39,22 +47,19 @@ spec:
             --ServerApp.quit_button=False
         - name: JUPYTER_IMAGE
           value: {{ .Values.notebook.image.repository }}:{{ .Values.notebook.image.tag }}
+        # Keep Jupyter runtime/config/cache off the PVC root.
+        - name: JUPYTER_RUNTIME_DIR
+          value: /tmp/jupyter/runtime
+        - name: JUPYTER_CONFIG_DIR
+          value: /tmp/jupyter/config
+        - name: JUPYTER_DATA_DIR
+          value: /tmp/jupyter/data
+        - name: XDG_CACHE_HOME
+          value: /tmp/.cache
         - name: GROUNDX_API_KEY
           value: {{ .Values.notebook.groundx.apiKey | quote }}
         - name: GROUNDX_ENDPOINT
           value: {{ .Values.notebook.groundx.endpoint | quote }}
-        {{- if not .Values.notebook.openshiftAI.dataConnections.enabled }}
-        - name: AWS_ACCESS_KEY_ID
-          value: {{ .Values.notebook.minio.accessKey | quote }}
-        - name: AWS_SECRET_ACCESS_KEY
-          value: {{ .Values.notebook.minio.secretKey | quote }}
-        - name: AWS_S3_ENDPOINT
-          value: {{ .Values.notebook.minio.endpoint | quote }}
-        - name: AWS_DEFAULT_REGION
-          value: {{ .Values.notebook.minio.region | default "us-east-1" | quote }}
-        - name: AWS_S3_BUCKET
-          value: {{ .Values.notebook.minio.defaultBucket | quote }}
-        {{- end }}
         ports:
         - containerPort: 8888
           name: notebook-port
