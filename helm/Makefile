@@ -14,6 +14,10 @@ install:
 	helm upgrade --install billing-workloads $(HELM_WORKLOADS) -f $(HELM_WORKLOADS)/values.yaml -n $(NAMESPACE)
 
 uninstall:
+	oc get perconaxtradbclusters.pxc.percona.com -n $(NAMESPACE) -o name | xargs -n 1 -I {} oc patch {} -n $(NAMESPACE) -p '{"metadata":{"finalizers":[]}}' --type=merge
+	@for topic in $$(oc get kafkatopics -n $(NAMESPACE) -o name 2>/dev/null); do \
+		oc patch "$$topic" -n $(NAMESPACE) --type=merge -p '{"metadata":{"finalizers":[]}}'; \
+	done
 	helm uninstall billing-workloads -n $(NAMESPACE) --ignore-not-found || true
 	helm uninstall billing-operators -n $(NAMESPACE) --ignore-not-found || true
 	# oc delete project $(NAMESPACE) --ignore-not-found || true

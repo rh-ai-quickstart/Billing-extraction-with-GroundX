@@ -1,60 +1,13 @@
-# Phase 2: Cluster instances, secrets, and GroundX
-# Install this chart AFTER billing-operators is deployed and all operators are running.
+# Billing Workloads - This is the actual application pods. To be installed after the billing-operators. 
 
-# ---------------------------------------------------------------------------
-# llm-service  (ai-architecture-charts) – deploys vLLM models e.g. Gemma 3 12B
-# Set llm-service.enabled to true and configure global.models below.
-# ---------------------------------------------------------------------------
-llm-service:
-  enabled: true
-  secret:
-    hf_token: ""   # Optional: set for gated Hugging Face models (e.g. some Gemma variants)
-    enabled: true
-
-# Models deployed by llm-service. Merged with chart defaults; only enabled models are deployed.
-# See: https://github.com/rh-ai-quickstart/ai-architecture-charts/blob/main/llm-service/helm/values.yaml
 global:
   # Set to true when deploying on OpenShift / OpenShift AI
   openshift: true
-  models:
-    gemma-3-12b-it:
-      id: google/gemma-3-12b-it
-      enabled: true
-      device: gpu
-      # Match GPU node taints used in this cluster (p4-gpu, g5-gpu, g5-small-gpu)
-      tolerations:
-        - key: g5-gpu
-          operator: Exists
-          effect: NoSchedule
-        - key: g5-small-gpu
-          operator: Exists
-          effect: NoSchedule
-        - key: p4-gpu
-          operator: Exists
-          effect: NoSchedule
-      resources:
-        limits:
-          cpu: "2"
-          memory: 32Gi
-        requests:
-          cpu: "1"
-          memory: 16Gi
-      args:
-        - --max-model-len
-        - "8192"
-        - --max-num-seqs
-        - "32"
-
 # Container image for cleanup hook Jobs
 job:
   image: quay.io/openshift/origin-cli:latest
 
 # MinIO Route targets.
-# MinIO Operator v7 creates (confirmed via: oc get svc -n eyelevel | grep minio):
-#   minio                  ClusterIP  port 80   (named: http-minio)   → S3 API
-#   minio-tenant-console   ClusterIP  port 9090 (named: http-console) → Console UI
-#   minio-tenant-hl        ClusterIP  None (headless, internal only)
-# NOTE: the API service is 'minio' (not 'minio-tenant'); console port is 9090 (not 9001).
 minio:
   api:
     serviceName: minio
@@ -186,7 +139,7 @@ groundx-secret:
     GROUNDX_ADMIN_API_KEY: "00000000-0000-0000-0000-000000000001"
     GROUNDX_ADMIN_PASSWORD: password
     GROUNDX_ADMIN_USERNAME: "00000000-0000-0000-0000-000000000000"
-    GROUNDX_AGENT_API_KEY: LLM_API_KEY
+    GROUNDX_AGENT_API_KEY: sk-pcUuxzNwAaG-t6eieZ5HXg
     GROUNDX_LICENSE_KEY: "00000000-0000-0000-0000-000000000002"
     GROUNDX_ACCESS_KEY_ID: minio
     GROUNDX_SECRET_ACCESS_KEY: minio123
@@ -223,7 +176,7 @@ groundx:
     serviceType: Route
   engines:
     default:
-      engineId: google/gemma-3-12b-it
+      engineId: llama-scout-17b
       reasoningEffort: low
       vision: false
   summary:
@@ -232,6 +185,7 @@ groundx:
   layout:
     inference:
       enabled: true
+      imagePullPolicy: Always
       tolerations:
         - key: g5-gpu
           operator: Exists
@@ -253,11 +207,11 @@ groundx:
       replicas:
         desired: 1
       enabled: true
-      # To use the deployed Gemma 3 12B from llm-service, set modelId to "google/gemma-3-12b-it"
+      # To use the deployed Gemma 3 12B from llm-service, set modelId to "llama-scout-17b"
       # and apiBaseUrl to the gemma-3-12b-it predictor URL (e.g. route or http://gemma-3-12b-it-predictor.<namespace>.svc.cluster.local/v1).
-      modelId: google/gemma-3-12b-it
-      apiBaseUrl: http://gemma-3-12b-it-predictor.eyelevel.svc.cluster.local:8080/v1
-      serviceType: openai
+      modelId: llama-scout-17b
+      apiBaseUrl: https://litellm-prod.apps.maas.redhatworkshops.io/v1
+      serviceType: openai-base64
       resources:
         requests:
           cpu: 100m
@@ -265,6 +219,7 @@ groundx:
     api:
       enabled: true
       serviceType: Route
+      timeout: 300
       resources:
         requests:
           cpu: 100m
@@ -289,13 +244,7 @@ groundx:
 # ---------------------------------------------------------------------------
 notebook:
   enabled: true
-
-  # Username that owns the workbench in OpenShift AI.
-  # Must match your cluster identity (oc whoami), e.g. rjjohnso@redhat.com
   username: "rjjohnso@redhat.com"
-
-  # Security context defaults for notebook PVC writeability.
-  # These values align with common OpenShift AI notebook images.
   podSecurityContext:
     fsGroup: 1001
     fsGroupChangePolicy: "OnRootMismatch"
@@ -303,16 +252,10 @@ notebook:
     runAsUser: 1001
     runAsGroup: 1001
     allowPrivilegeEscalation: false
-
-  # Notebook container image
-  # Use an image stream tag from the OpenShift internal registry, e.g.:
-  #   image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/tensorflow:2025.2
   image:
     repository: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/s2i-minimal-notebook
     tag: "2025.2"
     pullPolicy: Always
-
-  # CPU / memory for the notebook pod
   resources:
     limits:
       cpu: "2"
@@ -320,40 +263,28 @@ notebook:
     requests:
       cpu: "1"
       memory: "4Gi"
-
-  # Persistent workspace volume
   storage:
     size: 20Gi
     storageClassName: ""   # Leave blank to use the cluster default StorageClass
-
-  # Shared memory volume (useful for large model inference inside the notebook)
   shm:
     enabled: true
     size: 2Gi
-
-  # GroundX connection – injected as env vars into the notebook container
   groundx:
     apiKey: ""            # Set to your GroundX API key
     endpoint: ""          # e.g. https://api.groundx.ai/api/v1
-
-  # MinIO / S3 connection – injected as env vars and used for the data connection Secret
   minio:
     accessKey: "minio"
     secretKey: "minio123"
     endpoint: ""          # e.g. https://minio-api-<namespace>.apps.<cluster-domain>
     region: "us-east-1"
     defaultBucket: "billing-artifacts"
-
-  # OpenShift AI data connection Secrets (s3-type) visible in the RHOAI dashboard
   openshiftAI:
     dataConnections:
       enabled: true
-
-  # Optional one-shot git clone into notebook PVC after the notebook is Ready.
   gitClone:
     enabled: false
     repository: "https://github.com/johnson2500/Billing-extraction-with-GroundX.git"
-    revision: "main"      # branch, tag, or commit SHA
+    revision: "rj_helmify"      # branch, tag, or commit SHA
     targetDir: "Billing-extraction-with-GroundX"
     depth: 1
     waitTimeoutSeconds: 900
@@ -361,7 +292,5 @@ notebook:
       repository: alpine/git
       tag: "2.47.2"
       pullPolicy: IfNotPresent
-    # If true and targetDir already has a git repo, hard-reset to revision.
-    # If false, existing clone is left unchanged.
     forceReset: false
 
