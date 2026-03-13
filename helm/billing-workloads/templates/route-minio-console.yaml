@@ -1,0 +1,19 @@
+{{/*
+MinIO Console route. Targets the console service created by MinIO Operator
+(service name minio-tenant-console). Values under minio.console allow override.
+*/}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: minio-tenant-console
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+spec:
+  port:
+    targetPort: {{ .Values.minio.console.targetPort | default "http-console" }}
+  to:
+    kind: Service
+    name: {{ .Values.minio.console.serviceName | default "minio-tenant-console" }}
+    weight: 100
+  wildcardPolicy: None

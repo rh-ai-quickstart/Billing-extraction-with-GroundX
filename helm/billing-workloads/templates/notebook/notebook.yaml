@@ -1,0 +1,113 @@
+{{- if and .Values.notebook.enabled .Values.global.openshift }}
+apiVersion: kubeflow.org/v1
+kind: Notebook
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-notebook
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notebook
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/odh-managed: "true"
+  annotations:
+    notebooks.opendatahub.io/inject-auth: "true"
+    opendatahub.io/username: {{ .Values.notebook.username | default "admin" | quote }}
+    opendatahub.io/notebook-image: "{{ .Values.notebook.image.repository }}:{{ .Values.notebook.image.tag }}"
+spec:
+  template:
+    spec:
+      # No serviceAccountName — the notebook controller creates a per-notebook SA
+      # which is required for kube-rbac-proxy injection to work correctly.
+      enableServiceLinks: false
+      {{- with .Values.notebook.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ include "billing-workloads.fullname" . }}-notebook
+        image: {{ .Values.notebook.image.repository }}:{{ .Values.notebook.image.tag }}
+        imagePullPolicy: Always
+        workingDir: /opt/app-root/src
+        {{- with .Values.notebook.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .Values.notebook.openshiftAI.dataConnections.enabled }}
+        envFrom:
+        - secretRef:
+            name: billing-minio-storage
+        {{- end }}
+        env:
+        - name: NOTEBOOK_ARGS
+          value: >-
+            --ServerApp.port=8888
+            --ServerApp.token=''
+            --ServerApp.password=''
+            --ServerApp.base_url=/notebook/{{ .Release.Namespace }}/{{ include "billing-workloads.fullname" . }}-notebook
+            --ServerApp.quit_button=False
+        - name: JUPYTER_IMAGE
+          value: {{ .Values.notebook.image.repository }}:{{ .Values.notebook.image.tag }}
+        # Keep Jupyter runtime/config/cache off the PVC root.
+        - name: JUPYTER_RUNTIME_DIR
+          value: /tmp/jupyter/runtime
+        - name: JUPYTER_CONFIG_DIR
+          value: /tmp/jupyter/config
+        - name: JUPYTER_DATA_DIR
+          value: /tmp/jupyter/data
+        - name: XDG_CACHE_HOME
+          value: /tmp/.cache
+        - name: GROUNDX_API_KEY
+          value: {{ .Values.notebook.groundx.apiKey | quote }}
+        - name: GROUNDX_ENDPOINT
+          value: {{ .Values.notebook.groundx.endpoint | quote }}
+        ports:
+        - containerPort: 8888
+          name: notebook-port
+          protocol: TCP
+        resources:
+          limits:
+            cpu: {{ .Values.notebook.resources.limits.cpu | quote }}
+            memory: {{ .Values.notebook.resources.limits.memory | quote }}
+          requests:
+            cpu: {{ .Values.notebook.resources.requests.cpu | quote }}
+            memory: {{ .Values.notebook.resources.requests.memory | quote }}
+        livenessProbe:
+          httpGet:
+            scheme: HTTP
+            path: /notebook/{{ .Release.Namespace }}/{{ include "billing-workloads.fullname" . }}-notebook/api
+            port: notebook-port
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            scheme: HTTP
+            path: /notebook/{{ .Release.Namespace }}/{{ include "billing-workloads.fullname" . }}-notebook/api
+            port: notebook-port
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: {{ include "billing-workloads.fullname" . }}-notebook-storage
+          mountPath: /opt/app-root/src/
+        - name: shm
+          mountPath: /dev/shm
+        - name: runtime-images
+          mountPath: /opt/app-root/pipeline-runtimes/
+      volumes:
+      - name: {{ include "billing-workloads.fullname" . }}-notebook-storage
+        persistentVolumeClaim:
+          claimName: {{ include "billing-workloads.fullname" . }}-notebook-pvc
+      - name: shm
+        emptyDir:
+          medium: Memory
+      - name: runtime-images
+        configMap:
+          name: pipeline-runtime-images
+          defaultMode: 420
+          optional: true
+{{- end }}

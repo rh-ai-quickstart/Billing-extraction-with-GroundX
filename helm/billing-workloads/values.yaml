@@ -1,0 +1,296 @@
+# Billing Workloads - This is the actual application pods. To be installed after the billing-operators. 
+
+global:
+  # Set to true when deploying on OpenShift / OpenShift AI
+  openshift: true
+# Container image for cleanup hook Jobs
+job:
+  image: quay.io/openshift/origin-cli:latest
+
+# MinIO Route targets.
+minio:
+  api:
+    serviceName: minio
+    targetPort: http-minio
+  console:
+    serviceName: minio-tenant-console
+    targetPort: http-console
+
+# ServiceAccount used by cleanup hook Jobs
+serviceAccount:
+  create: true
+  name: ""
+  clusterRole: cluster-admin
+
+# Whether to delete the OpenShift project on helm uninstall
+deleteProject: true
+
+logLevel: debug
+# ---------------------------------------------------------------------------
+# db-cluster  (alias for percona/pxc-db)
+# mirrors: values/values.percona.cluster.yaml
+# ---------------------------------------------------------------------------
+db-cluster:
+  nameOverride: db-cluster
+  fullnameOverride: db-cluster
+  backup:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  haproxy:
+    enabled: true
+    nodeSelector:
+      node: eyelevel-node
+    resources:
+      requests:
+        cpu: 600m
+        memory: 1Gi
+    size: 1
+  logcollector:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  nodeSelector:
+    node: eyelevel-node
+  pmm:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  proxysql:
+    enabled: false
+    nodeSelector:
+      node: eyelevel-node
+  pxc:
+    nodeSelector:
+      node: eyelevel-node
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 600m
+        memory: 512Mi
+    size: 1
+  secrets:
+    passwords:
+      root: password
+      xtrabackup: password
+      monitor: password
+      clustercheck: password
+      proxyadmin: password
+      operator: password
+      replication: password
+  unsafeFlags:
+    pxcSize: true
+    proxySize: true
+
+# ---------------------------------------------------------------------------
+# minio-cluster  (alias for minio-operator/tenant)
+# mirrors: values/values.minio.tenant.yaml
+# ---------------------------------------------------------------------------
+minio-cluster:
+  tenant:
+    certificate:
+      requestAutoCert: false
+    configSecret:
+      accessKey: minio
+      secretKey: minio123
+    containerSecurityContext: null
+    name: minio-tenant
+    nodeSelector:
+      node: eyelevel-node
+    podSecurityContext: null
+    securityContext: null
+    pools:
+      - name: minio-tenant-pool-0
+        containerSecurityContext: null
+        nodeSelector:
+          node: eyelevel-node
+        podSecurityContext: null
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext: null
+        servers: 1
+        size: 20Gi
+        storageClassName: eyelevel-pv
+        volumesPerServer: 1
+
+# ---------------------------------------------------------------------------
+# stream-cluster  (alias for groundx-strimzi-kafka-cluster)
+# mirrors: values/values.strimzi.cluster.yaml
+# ---------------------------------------------------------------------------
+stream-cluster:
+  node: eyelevel-node
+  enabled: true
+  cluster:
+    version: 4.1.0  # Strimzi operator supports [4.0.0, 4.1.0]
+    metaVersion: "4.1"
+
+# ---------------------------------------------------------------------------
+# groundx-secret
+# mirrors: values/values.groundx.secret.yaml
+# ---------------------------------------------------------------------------
+groundx-secret:
+  name: eyelevel-secret-credentials
+  namespace: eyelevel
+  data:
+    GROUNDX_ADMIN_EMAIL: support@myco.net
+    GROUNDX_ADMIN_API_KEY: "00000000-0000-0000-0000-000000000001"
+    GROUNDX_ADMIN_PASSWORD: password
+    GROUNDX_ADMIN_USERNAME: "00000000-0000-0000-0000-000000000000"
+    GROUNDX_AGENT_API_KEY: sk-pcUuxzNwAaG-t6eieZ5HXg
+    GROUNDX_LICENSE_KEY: "00000000-0000-0000-0000-000000000002"
+    GROUNDX_ACCESS_KEY_ID: minio
+    GROUNDX_SECRET_ACCESS_KEY: minio123
+    MYSQL_INIT_PASSWORD: password
+    MYSQL_INIT_USER: root
+    MYSQL_USER: eyelevel
+    MYSQL_PASSWORD: password
+
+# ---------------------------------------------------------------------------
+# groundx
+# mirrors: values/values.groundx.yaml
+# ---------------------------------------------------------------------------
+groundx:
+  licenseKey: "00000000-0000-0000-0000-000000000000"
+  mode: ingest
+  cluster:
+    pvClass: eyelevel-pv
+    type: openshift
+    imagePullPolicy: Always
+    secrets:
+      - eyelevel-secret-credentials
+    preProcessors:
+      - processorId: 13
+        type: extract
+    nodeLabels:
+      cpuMemory: eyelevel-node
+      cpuOnly: eyelevel-node
+      gpuLayout: eyelevel-node
+      gpuRanker: eyelevel-node
+      gpuSummary: eyelevel-node
+  file:
+    customDomain: minio-eyelevel.apps.ai-dev02.kni.syseng.devcluster.openshift.com
+  groundx:
+    serviceType: Route
+  engines:
+    default:
+      engineId: llama-scout-17b
+      reasoningEffort: low
+      vision: false
+  summary:
+    existing:
+      serviceType: openai-base64
+  layout:
+    inference:
+      enabled: true
+      imagePullPolicy: Always
+      tolerations:
+        - key: g5-gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: g5-small-gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: p4-gpu
+          operator: Exists
+          effect: NoSchedule
+    api:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+  extract:
+    enabled: true
+    agent:
+      replicas:
+        desired: 1
+      enabled: true
+      # To use the deployed Gemma 3 12B from llm-service, set modelId to "llama-scout-17b"
+      # and apiBaseUrl to the gemma-3-12b-it predictor URL (e.g. route or http://gemma-3-12b-it-predictor.<namespace>.svc.cluster.local/v1).
+      modelId: llama-scout-17b
+      apiBaseUrl: https://litellm-prod.apps.maas.redhatworkshops.io/v1
+      serviceType: openai-base64
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+    api:
+      enabled: true
+      serviceType: Route
+      timeout: 300
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    download:
+      enabled: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+    save:
+      enabled: true
+      resources:
+        requests:
+          cpu: 1
+          memory: 1Gi
+
+# ---------------------------------------------------------------------------
+# notebook – OpenShift AI Workbench (Jupyter Notebook)
+# Deploys a kubeflow.org/v1 Notebook CR on OpenShift AI.
+# Requires global.openshift: true to create OpenShift-specific resources.
+# ---------------------------------------------------------------------------
+notebook:
+  enabled: true
+  username: "rjjohnso@redhat.com"
+  podSecurityContext:
+    fsGroup: 1001
+    fsGroupChangePolicy: "OnRootMismatch"
+  containerSecurityContext:
+    runAsUser: 1001
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+  image:
+    repository: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/s2i-minimal-notebook
+    tag: "2025.2"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: "2"
+      memory: "8Gi"
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+  storage:
+    size: 20Gi
+    storageClassName: ""   # Leave blank to use the cluster default StorageClass
+  shm:
+    enabled: true
+    size: 2Gi
+  groundx:
+    apiKey: ""            # Set to your GroundX API key
+    endpoint: ""          # e.g. https://api.groundx.ai/api/v1
+  minio:
+    accessKey: "minio"
+    secretKey: "minio123"
+    endpoint: ""          # e.g. https://minio-api-<namespace>.apps.<cluster-domain>
+    region: "us-east-1"
+    defaultBucket: "billing-artifacts"
+  openshiftAI:
+    dataConnections:
+      enabled: true
+  gitClone:
+    enabled: false
+    repository: "https://github.com/johnson2500/Billing-extraction-with-GroundX.git"
+    revision: "rj_helmify"      # branch, tag, or commit SHA
+    targetDir: "Billing-extraction-with-GroundX"
+    depth: 1
+    waitTimeoutSeconds: 900
+    image:
+      repository: alpine/git
+      tag: "2.47.2"
+      pullPolicy: IfNotPresent
+    forceReset: false
+

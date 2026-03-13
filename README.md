@@ -18,7 +18,8 @@ When used with OpenShift AI on premises, customers can have complete control of 
   - [Deployment steps](#deployment-steps)
 - [Demo GroundX](#demo-groundx)
   - [Create storage bucket for models](#create-storage-bucket-for-models)
-  - [Create a new workbench in OpenShift AI](#create-a-new-workbench-in-openShift-ai)
+  - [Use the chart-managed notebook (recommended)](#use-the-chart-managed-notebook-recommended)
+  - [Create a new workbench in OpenShift AI](#create-a-new-workbench-in-openshift-ai)
   - [Clone this repo](#clone-this-repo)
   - [Copy the model to local storage](#copy-the-model-to-local-storage)
   - [Create the model registry](#create-the-model-registry)
@@ -43,7 +44,7 @@ You will deploy GroundX, as well as other components including MinIO (object sto
   - MinIO
   - Kafka
   - GroundX
-2. Run a Jupytper notebook to demostrate data extraction from a mobile phone bill
+2. Run a Jupyter notebook to demonstrate data extraction from a mobile phone bill.
 
 ### Architecture diagrams
 
@@ -107,12 +108,12 @@ The steps assume the following pre-requisite products and components are deploye
 
 1. Clone this repo and change into the directory
 ```
-$ git clone https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git
+$ git clone https://github.com/johnson2500/Billing-extraction-with-GroundX.git
 
 $ cd Billing-extraction-with-GroundX
 ```
 
-Set the API key in `values.groundx.secret.yaml`
+Set the API key in `values/values.groundx.secret.yaml`
 ```
 $ cp <secret_with_key>.yaml Billing-extraction-with-GroundX/values/values.groundx.secret.yaml
 ```
@@ -125,7 +126,7 @@ $ oc login --token=<user_token> --server=https://api.<openshift_cluster_fqdn>:64
 3. Make sure `setup` file is executable and run it, passing it the name of the project in which to install. Deploy to the `eyelevel` project.
 ```
 # Make script executable
-$ chmod + setup
+$ chmod +x setup
 
 # Run script passing it the project in which to install
 $ ./setup eyelevel
@@ -137,10 +138,24 @@ The following steps walk through the demonstration.
 ### Create storage bucket for models
 The model used for the demonstration will be copied from Hugging Face to the local Minio instance. For this, we'll create a `models` storage bucket.
 1. Use the Minio console route to access Minio's UI
-2. Create a storge bucket called `models`
+2. Create a storage bucket called `models`
+
+### Use the chart-managed notebook (recommended)
+If you deploy the chart at `helm/billing-workloads`, it can create the OpenShift AI notebook and optionally clone this repository into the notebook PVC.
+
+1. Configure notebook settings in `helm/billing-workloads/values.yaml`
+2. Enable automatic clone by setting:
+   - `notebook.gitClone.enabled: true`
+   - `notebook.gitClone.repository: https://github.com/johnson2500/Billing-extraction-with-GroundX.git`
+   - (optional) `notebook.gitClone.revision`, `notebook.gitClone.targetDir`, `notebook.gitClone.forceReset`
+3. Deploy/upgrade the chart in your project:
+```
+$ helm upgrade --install billing-workloads ./helm/billing-workloads -n eyelevel
+```
+4. Open the created notebook from OpenShift AI Workbenches.
 
 ### Create a new workbench in OpenShift AI
-In OpenShift AI, create a workbench, following the steps below. You'll need your Hugging Face token to add to the environment variable.
+If you are not using the chart-managed notebook, create a workbench manually in OpenShift AI. You'll need your Hugging Face token to add to the environment variable.
 
 1. In OpenShift AI, enter into the `eyelevel` project
 2. Create a workbench
@@ -170,7 +185,7 @@ In OpenShift AI, create a workbench, following the steps below. You'll need your
 
 ### Clone this repo
 1. Open the running workbench
-2. Clone this repo into the workbench
+2. If `notebook.gitClone.enabled` is `false`, clone this repo into the workbench manually
 
 ### Copy the model to local storage
 1. Open the **Transfer_models** notebook
@@ -220,6 +235,16 @@ $ ./uninstall eyelevel
 
 ## Technical details
 
+### Deploying Gemma 3 12B via LLM service (optional)
+
+The chart can deploy **google/gemma-3-12b-it** using the [llm-service](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/llm-service) from the ai-architecture-charts repo (same pattern as the [RAG](https://github.com/rh-ai-quickstart/RAG) blueprint).
+
+- **Enable**: In `helm/billing-workloads/values.yaml`, `llm-service.enabled` is `true` by default and `global.models.gemma-3-12b-it` is configured.
+- **Requirements**: Nodes with NVIDIA GPUs (e.g. `nvidia.com/gpu`); the model uses the default GPU device and tolerations from the llm-service chart.
+- **Hugging Face token**: If the model is gated, set `llm-service.secret.hf_token` (e.g. via a values override or sealed secret).
+- **Use with GroundX**: After deploy, the model is exposed as a KServe InferenceService. To use it for GroundX extract, set the extract agent to your cluster’s endpoint for the `gemma-3-12b-it` predictor (e.g. the OpenShift route or internal URL such as `http://gemma-3-12b-it-predictor.<namespace>.svc.cluster.local/v1`), and set `modelId` to the served model name (e.g. `google/gemma-3-12b-it`).
+
+To disable the LLM service and Gemma deployment, set `llm-service.enabled: false` in values.
 
 ## Tags
 
