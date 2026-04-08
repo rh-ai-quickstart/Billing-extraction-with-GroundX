@@ -107,6 +107,8 @@ oc login --token=<user_token> --server=https://api.<openshift_cluster_fqdn>:6443
 
 2. **Set the GroundX Agent API key** as an environment variable:
 
+With the current values.yaml configuration this API key is expected to be OPENAI_API_KEY since we by default are using Open AI LLMs for inference.
+
 ```bash
 export GROUNDX_AGENT_API_KEY="<your-groundx-agent-api-key>"
 ```
