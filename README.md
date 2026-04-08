@@ -99,7 +99,7 @@ The following must already be deployed and functional on the cluster:
 1. **Clone this repo and log in to your cluster:**
 
 ```bash
-git clone https://github.com/johnson2500/Billing-extraction-with-GroundX.git
+git clone https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git
 cd Billing-extraction-with-GroundX
 
 oc login --token=<user_token> --server=https://api.<openshift_cluster_fqdn>:6443
@@ -179,20 +179,20 @@ To run with a GPU (CPU-only), set `nvidia.com/gpu` to `'1'`. See the comments in
 
 ### Use the Chart-managed Notebook (Recommended)
 
-The billing-workloads chart can create an OpenShift AI notebook and optionally clone this repository into the notebook PVC.
+The billing-workloads chart creates an OpenShift AI **Notebook** and, by default, a Helm **post-install / post-upgrade Job** (`helm/billing-workloads/templates/notebook/git-clone-job.yaml`) that waits for the notebook pod to be Ready, then clones the quickstart repository into the notebook PVC under `notebook.gitClone.targetDir`.
 
 1. Configure notebook settings in `helm/billing-workloads/values.yaml`.
-2. Enable automatic clone by setting:
-   - `notebook.gitClone.enabled: true`
-   - `notebook.gitClone.repository: https://github.com/johnson2500/Billing-extraction-with-GroundX.git`
-   - (optional) `notebook.gitClone.revision`, `notebook.gitClone.targetDir`, `notebook.gitClone.forceReset`
-3. Deploy/upgrade the chart:
+2. Git clone is **enabled by default** (`notebook.gitClone.enabled: true`). To turn it off (for example, air-gapped clusters), set `notebook.gitClone.enabled: false` and clone the repo manually inside the workbench.
+3. Override clone source or branch as needed:
+   - `notebook.gitClone.repository` (default: `https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git`)
+   - (optional) `notebook.gitClone.revision`, `notebook.gitClone.targetDir`, `notebook.gitClone.forceReset`, `notebook.gitClone.cloneRetries`
+4. Deploy/upgrade the chart:
 
 ```bash
 make install
 ```
 
-4. Open the created notebook from **OpenShift AI → Workbenches**.
+5. Open the created notebook from **OpenShift AI → Workbenches**.
 
 ### Create a New Workbench Manually
 
@@ -220,7 +220,7 @@ If you are not using the chart-managed notebook, create a workbench in OpenShift
      - **Region**: `us-east-1`
      - **Bucket**: `models`
 3. Click **Create notebook**.
-4. Clone this repo into the workbench if `notebook.gitClone.enabled` is `false`.
+4. Clone this repo into the workbench if you disabled the chart git-clone Job (`notebook.gitClone.enabled: false`).
 
 ### Run the GroundX Demo
 

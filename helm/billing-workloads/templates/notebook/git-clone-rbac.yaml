@@ -1,0 +1,37 @@
+{{- if and .Values.notebook.enabled .Values.global.openshift .Values.notebook.gitClone.enabled }}
+{{/*
+The git-clone Job uses the same ServiceAccount as the Notebook CR so it runs
+with the existing anyuid binding (scc-anyuid.yaml) and can use UID/GID 1001 to
+write to the notebook PVC. This Role lets that SA run oc get pod in the init
+wait container.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-notebook-git-clone
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notebook-git-clone
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-notebook-git-clone
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notebook-git-clone
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "billing-workloads.fullname" . }}-notebook-git-clone
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "billing-workloads.fullname" . }}-notebook
+    namespace: {{ .Release.Namespace }}
+{{- end }}

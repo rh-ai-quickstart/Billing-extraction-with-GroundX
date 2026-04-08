@@ -62,7 +62,7 @@ spec:
               name: {{ .Values.notebook.groundx.secretName | default "eyelevel-secret-credentials" }}
               key: GROUNDX_ADMIN_API_KEY
         - name: GROUNDX_BASE_URL
-          value: {{ .Values.notebook.groundx.baseUrl | quote }}
+          value: {{ include "billing-workloads.groundxBaseUrlForNotebook" . | quote }}
         ports:
         - containerPort: 8888
           name: notebook-port
