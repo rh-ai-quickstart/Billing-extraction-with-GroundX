@@ -105,17 +105,21 @@ cd Billing-extraction-with-GroundX
 oc login --token=<user_token> --server=https://api.<openshift_cluster_fqdn>:6443
 ```
 
-2. **Set the GroundX API key** by copying your secret file into place:
+2. **Set the GroundX Agent API key** as an environment variable:
 
 ```bash
-cp <secret_with_key>.yaml values/values.groundx.secret.yaml
+export GROUNDX_AGENT_API_KEY="<your-groundx-agent-api-key>"
 ```
+
+This key is required and is used to populate the `GROUNDX_AGENT_API_KEY` field in the `eyelevel-secret-credentials` Kubernetes Secret (managed by the `groundx-secret` subchart). The Makefile will fail with an error if the variable is not set.
 
 3. **Review and edit the values files** to match your environment:
    - `helm/billing-operators/values.yaml` — operator toggles, node labels
    - `helm/billing-workloads/values.yaml` — GroundX config, notebook settings, resource limits
 
 4. **Install using the Makefile** (recommended):
+
+**Be sure to set GROUNDX_AGENT_API_KEY env variable.**
 
 ```bash
 # From the repo root — installs operators first, then workloads
@@ -138,7 +142,8 @@ helm upgrade --install billing-operators ./helm/billing-operators \
 
 # Phase 2: Workloads
 helm upgrade --install billing-workloads ./helm/billing-workloads \
-  -f ./helm/billing-workloads/values.yaml -n eyelevel
+  -f ./helm/billing-workloads/values.yaml -n eyelevel \
+  --set groundx-secret.data.GROUNDX_AGENT_API_KEY="${GROUNDX_AGENT_API_KEY}"
 ```
 
 ### Verify the Deployment
