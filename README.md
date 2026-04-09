@@ -99,23 +99,29 @@ The following must already be deployed and functional on the cluster:
 1. **Clone this repo and log in to your cluster:**
 
 ```bash
-git clone https://github.com/johnson2500/Billing-extraction-with-GroundX.git
+git clone https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git
 cd Billing-extraction-with-GroundX
 
 oc login --token=<user_token> --server=https://api.<openshift_cluster_fqdn>:6443
 ```
 
-2. **Set the GroundX API key** by copying your secret file into place:
+2. **Set the GroundX Agent API key** as an environment variable:
+
+With the current values.yaml configuration this API key is expected to be OPENAI_API_KEY since we by default are using Open AI LLMs for inference.
 
 ```bash
-cp <secret_with_key>.yaml values/values.groundx.secret.yaml
+export GROUNDX_AGENT_API_KEY="<your-groundx-agent-api-key>"
 ```
+
+This key is required and is used to populate the `GROUNDX_AGENT_API_KEY` field in the `eyelevel-secret-credentials` Kubernetes Secret (managed by the `groundx-secret` subchart). The Makefile will fail with an error if the variable is not set.
 
 3. **Review and edit the values files** to match your environment:
    - `helm/billing-operators/values.yaml` — operator toggles, node labels
    - `helm/billing-workloads/values.yaml` — GroundX config, notebook settings, resource limits
 
 4. **Install using the Makefile** (recommended):
+
+**Be sure to set GROUNDX_AGENT_API_KEY env variable.**
 
 ```bash
 # From the repo root — installs operators first, then workloads
@@ -138,7 +144,8 @@ helm upgrade --install billing-operators ./helm/billing-operators \
 
 # Phase 2: Workloads
 helm upgrade --install billing-workloads ./helm/billing-workloads \
-  -f ./helm/billing-workloads/values.yaml -n eyelevel
+  -f ./helm/billing-workloads/values.yaml -n eyelevel \
+  --set groundx-secret.data.GROUNDX_AGENT_API_KEY="${GROUNDX_AGENT_API_KEY}"
 ```
 
 ### Verify the Deployment
@@ -179,20 +186,20 @@ To run with a GPU (CPU-only), set `nvidia.com/gpu` to `'1'`. See the comments in
 
 ### Use the Chart-managed Notebook (Recommended)
 
-The billing-workloads chart can create an OpenShift AI notebook and optionally clone this repository into the notebook PVC.
+The billing-workloads chart creates an OpenShift AI **Notebook** and, by default, a Helm **post-install / post-upgrade Job** (`helm/billing-workloads/templates/notebook/git-clone-job.yaml`) that waits for the notebook pod to be Ready, then clones the quickstart repository into the notebook PVC under `notebook.gitClone.targetDir`.
 
 1. Configure notebook settings in `helm/billing-workloads/values.yaml`.
-2. Enable automatic clone by setting:
-   - `notebook.gitClone.enabled: true`
-   - `notebook.gitClone.repository: https://github.com/johnson2500/Billing-extraction-with-GroundX.git`
-   - (optional) `notebook.gitClone.revision`, `notebook.gitClone.targetDir`, `notebook.gitClone.forceReset`
-3. Deploy/upgrade the chart:
+2. Git clone is **enabled by default** (`notebook.gitClone.enabled: true`). To turn it off (for example, air-gapped clusters), set `notebook.gitClone.enabled: false` and clone the repo manually inside the workbench.
+3. Override clone source or branch as needed:
+   - `notebook.gitClone.repository` (default: `https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git`)
+   - (optional) `notebook.gitClone.revision`, `notebook.gitClone.targetDir`, `notebook.gitClone.forceReset`, `notebook.gitClone.cloneRetries`
+4. Deploy/upgrade the chart:
 
 ```bash
 make install
 ```
 
-4. Open the created notebook from **OpenShift AI → Workbenches**.
+5. Open the created notebook from **OpenShift AI → Workbenches**.
 
 ### Create a New Workbench Manually
 
@@ -220,7 +227,7 @@ If you are not using the chart-managed notebook, create a workbench in OpenShift
      - **Region**: `us-east-1`
      - **Bucket**: `models`
 3. Click **Create notebook**.
-4. Clone this repo into the workbench if `notebook.gitClone.enabled` is `false`.
+4. Clone this repo into the workbench if you disabled the chart git-clone Job (`notebook.gitClone.enabled: false`).
 
 ### Run the GroundX Demo
 

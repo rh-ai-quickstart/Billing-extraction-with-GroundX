@@ -153,6 +153,10 @@ groundx-secret:
 # mirrors: values/values.groundx.yaml
 # ---------------------------------------------------------------------------
 groundx:
+  # Namespace where GroundX workloads run (groundx subchart default: eyelevel).
+  # When unset, the notebook auto-derived GROUNDX_BASE_URL uses the Helm release
+  # namespace, then falls back to eyelevel. Set explicitly if GroundX runs elsewhere.
+  # namespace: eyelevel
   licenseKey: "00000000-0000-0000-0000-000000000000"
   mode: ingest
   cluster:
@@ -177,7 +181,6 @@ groundx:
   engines:
     default:
       engineId: gpt-5-mini
-      reasoningEffort: low
       vision: true
   summary:
     existing:
@@ -297,9 +300,9 @@ notebook:
     # The API key is read from the eyelevel-secret-credentials Secret
     # (created by the groundx-secret subchart) — no need to duplicate it here.
     secretName: "eyelevel-secret-credentials"
-    # GroundX base URL as seen by the notebook.  Set this to the GroundX
-    # OpenShift Route with /api appended, e.g.:
-    #   https://groundx-api-eyelevel.apps.<cluster-domain>/api
+    # Optional override for GROUNDX_BASE_URL. When empty, the chart sets an
+    # in-cluster URL: http://<groundx.groundx.serviceName>.<ns>.svc.cluster.local/api
+    # Set only if the notebook must use an external OpenShift Route or HTTPS URL.
     baseUrl: ""
   minio:
     accessKey: "minio"
@@ -311,11 +314,12 @@ notebook:
     dataConnections:
       enabled: true
   gitClone:
-    enabled: false
-    repository: "https://github.com/johnson2500/Billing-extraction-with-GroundX.git"
-    revision: "rj_helmify"      # branch, tag, or commit SHA
+    enabled: true
+    repository: "https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git"
+    revision: "main"            # branch, tag, or commit SHA
     targetDir: "Billing-extraction-with-GroundX"
     depth: 1
+    cloneRetries: 5
     waitTimeoutSeconds: 900
     image:
       repository: alpine/git

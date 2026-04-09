@@ -1,6 +1,6 @@
 apiVersion: v2
 name: billing-workloads
-description: "Phase 2: Cluster instances, secrets, and GroundX for billing extraction"
+description: "Phase 2: Cluster instances, secrets, and GroundX for billing extraction. Includes an optional post-install Job (notebook.gitClone) that clones the quickstart repo into the workbench PVC when the OpenShift AI notebook is enabled."
 version: 0.1.0
 appVersion: "1.0.0"
 type: application

@@ -22,12 +22,23 @@ spec:
         {{- include "billing-workloads.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: notebook-git-clone
     spec:
-      serviceAccountName: {{ include "billing-workloads.serviceAccountName" . }}
+      # Same SA as the Notebook (see scc-anyuid.yaml) so we can runAsUser 1001
+      # and write to the workbench PVC; chart SA would get a random UID and hit
+      # "Permission denied" on /opt/app-root/src.
+      serviceAccountName: {{ include "billing-workloads.fullname" . }}-notebook
       restartPolicy: Never
+      {{- with .Values.notebook.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
         - name: wait-for-notebook-ready
           image: {{ .Values.job.image }}
           imagePullPolicy: IfNotPresent
+          {{- with .Values.notebook.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: HOME
               value: /tmp
@@ -61,6 +72,10 @@ spec:
         - name: git-clone
           image: {{ .Values.notebook.gitClone.image.repository }}:{{ .Values.notebook.gitClone.image.tag }}
           imagePullPolicy: {{ .Values.notebook.gitClone.image.pullPolicy }}
+          {{- with .Values.notebook.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           command:
             - /bin/sh
             - -c
@@ -71,6 +86,7 @@ spec:
               REPO="{{ $repo }}"
               DEPTH="{{ .Values.notebook.gitClone.depth | default 1 }}"
               FORCE_RESET="{{ .Values.notebook.gitClone.forceReset | default false }}"
+              CLONE_RETRIES="{{ .Values.notebook.gitClone.cloneRetries | default 5 }}"
 
               mkdir -p /opt/app-root/src
               if [ -d "$DEST/.git" ]; then
@@ -88,11 +104,28 @@ spec:
               if [ "$(dirname "$DEST")" != "." ]; then
                 mkdir -p "$(dirname "$DEST")"
               fi
-              if [ "$DEPTH" -gt 0 ] 2>/dev/null; then
-                git clone --depth "$DEPTH" --branch "$REV" "$REPO" "$DEST"
-              else
-                git clone --branch "$REV" "$REPO" "$DEST"
-              fi
+
+              attempt=0
+              while [ "$attempt" -lt "$CLONE_RETRIES" ]; do
+                attempt=$((attempt + 1))
+                if [ "$DEPTH" -gt 0 ] 2>/dev/null; then
+                  if git clone --depth "$DEPTH" --branch "$REV" "$REPO" "$DEST"; then
+                    echo "Clone succeeded on attempt $attempt"
+                    exit 0
+                  fi
+                else
+                  if git clone --branch "$REV" "$REPO" "$DEST"; then
+                    echo "Clone succeeded on attempt $attempt"
+                    exit 0
+                  fi
+                fi
+                if [ "$attempt" -ge "$CLONE_RETRIES" ]; then
+                  echo "git clone failed after $CLONE_RETRIES attempts"
+                  exit 1
+                fi
+                echo "Clone failed, retrying in 10s (attempt $attempt/$CLONE_RETRIES)..."
+                sleep 10
+              done
           volumeMounts:
             - name: {{ include "billing-workloads.fullname" . }}-notebook-storage
               mountPath: /opt/app-root/src/
