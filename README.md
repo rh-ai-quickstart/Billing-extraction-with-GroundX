@@ -1,6 +1,6 @@
 # Extract billing data with GroundX on OpenShift AI
 
-Learn how to extract structured billing data from unstructured documents using GroundX&reg; on Red Hat OpenShift AI&reg; with complete data control on-premises.
+Extract structured billing data from unstructured documents using GroundX&reg; on Red Hat OpenShift AI&reg; with complete data control on-premises.
 
 ## Table of contents
 
