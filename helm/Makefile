@@ -4,20 +4,32 @@ REPO_ROOT := $(abspath $(dir $(MAKEFILE_LIST))..)
 HELM_OPERATORS := $(REPO_ROOT)/helm/billing-operators
 HELM_WORKLOADS := $(REPO_ROOT)/helm/billing-workloads
 
-.PHONY: check-groundx-key install uninstall
+OPERATORS_SECRET := $(HELM_OPERATORS)/secret.yaml
+WORKLOADS_SECRET := $(HELM_WORKLOADS)/secret.yaml
 
-check-groundx-key:
-ifndef GROUNDX_AGENT_API_KEY
-	$(error GROUNDX_AGENT_API_KEY is not set. Export it before running install, e.g.: export GROUNDX_AGENT_API_KEY=<your-key>)
+OPERATORS_HELM_FLAGS := -f $(HELM_OPERATORS)/values.yaml
+ifneq (,$(wildcard $(OPERATORS_SECRET)))
+OPERATORS_HELM_FLAGS += -f $(OPERATORS_SECRET)
 endif
 
-install: check-groundx-key
+WORKLOADS_HELM_FLAGS := -f $(HELM_WORKLOADS)/values.yaml
+ifneq (,$(wildcard $(WORKLOADS_SECRET)))
+WORKLOADS_HELM_FLAGS += -f $(WORKLOADS_SECRET)
+endif
+
+.PHONY: install uninstall
+
+install:
+	@test -f $(WORKLOADS_SECRET) || ( \
+		echo "ERROR: $(WORKLOADS_SECRET) not found."; \
+		echo "  cd $(HELM_WORKLOADS) && cp secret.example.yaml secret.yaml"; \
+		echo "  Edit secret.yaml with your credentials, then re-run make install."; \
+		exit 1)
 	oc create namespace $(NAMESPACE) --dry-run=client -o yaml | oc apply -f - || true
 	cd $(HELM_OPERATORS) && helm dependency update
 	cd $(HELM_WORKLOADS) && helm dependency update
-	helm upgrade --install billing-operators $(HELM_OPERATORS) -f $(HELM_OPERATORS)/values.yaml -n $(NAMESPACE)
-	helm upgrade --install billing-workloads $(HELM_WORKLOADS) -f $(HELM_WORKLOADS)/values.yaml -n $(NAMESPACE) \
-		--set groundx-secret.data.GROUNDX_AGENT_API_KEY=$(GROUNDX_AGENT_API_KEY)
+	helm upgrade --install billing-operators $(HELM_OPERATORS) $(OPERATORS_HELM_FLAGS) -n $(NAMESPACE)
+	helm upgrade --install billing-workloads $(HELM_WORKLOADS) $(WORKLOADS_HELM_FLAGS) -n $(NAMESPACE)
 
 uninstall:
 	oc get perconaxtradbclusters.pxc.percona.com -n $(NAMESPACE) -o name | xargs -n 1 -I {} oc patch {} -n $(NAMESPACE) -p '{"metadata":{"finalizers":[]}}' --type=merge
