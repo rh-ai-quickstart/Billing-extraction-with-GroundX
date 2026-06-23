@@ -40,3 +40,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+GroundX Python client base URL for the workbench notebook.
+
+When notebook.groundx.baseUrl is unset/empty, derive the in-cluster URL from the
+same naming rules as the groundx subchart (groundx.groundx.serviceUrl):
+  http://<groundx.groundx.serviceName>.<namespace>.svc.cluster.local/api
+
+Namespace: groundx.namespace, else Helm release namespace, else "eyelevel".
+*/}}
+{{- define "billing-workloads.groundxBaseUrlForNotebook" -}}
+{{- $manual := .Values.notebook.groundx.baseUrl | default "" | trim -}}
+{{- if $manual -}}
+{{- $manual -}}
+{{- else -}}
+{{- $gxc := .Values.groundx.groundx | default dict -}}
+{{- $svc := dig "serviceName" "groundx" $gxc -}}
+{{- $ns := coalesce .Values.groundx.namespace .Release.Namespace "eyelevel" | trim -}}
+{{- printf "http://%s.%s.svc.cluster.local/api" $svc $ns -}}
+{{- end -}}
+{{- end }}
