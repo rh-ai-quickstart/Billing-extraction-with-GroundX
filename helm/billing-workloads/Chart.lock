@@ -1,7 +1,7 @@
 dependencies:
 - name: pxc-db
   repository: https://percona.github.io/percona-helm-charts/
-  version: 1.19.1
+  version: 1.20.0
 - name: tenant
   repository: https://operator.min.io/
   version: 7.1.1
@@ -17,5 +17,5 @@ dependencies:
 - name: llm-service
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   version: 0.5.2
-digest: sha256:d1e312d1b3fd1a591811585e7bdd9cec0bec9cfa3d2ae95391c4ba483cc05d4f
-generated: "2026-03-20T09:17:45.426368-04:00"
+digest: sha256:3f00072277e9b1d30801111169ef61b4d2b5e70b0863e65c8e037064a92cb064
+generated: "2026-06-23T09:19:36.117132-04:00"

@@ -70,15 +70,7 @@ db-cluster:
         cpu: 600m
         memory: 512Mi
     size: 1
-  secrets:
-    passwords:
-      root: password
-      xtrabackup: password
-      monitor: password
-      clustercheck: password
-      proxyadmin: password
-      operator: password
-      replication: password
+  # Passwords: copy secret.example.yaml → secret.yaml (see helm/billing-workloads/)
   unsafeFlags:
     pxcSize: true
     proxySize: true
@@ -91,9 +83,7 @@ minio-cluster:
   tenant:
     certificate:
       requestAutoCert: false
-    configSecret:
-      accessKey: minio
-      secretKey: minio123
+    # configSecret (accessKey, secretKey): see secret.example.yaml → secret.yaml
     containerSecurityContext: null
     name: minio-tenant
     nodeSelector:
@@ -129,31 +119,18 @@ stream-cluster:
 
 # ---------------------------------------------------------------------------
 # groundx-secret
-# mirrors: values/values.groundx.secret.yaml
+# Credential data: copy secret.example.yaml → secret.yaml
 # ---------------------------------------------------------------------------
 groundx-secret:
   name: eyelevel-secret-credentials
   namespace: eyelevel
-  data:
-    GROUNDX_ADMIN_EMAIL: support@myco.net
-    GROUNDX_ADMIN_API_KEY: "00000000-0000-0000-0000-000000000001"
-    GROUNDX_ADMIN_PASSWORD: password
-    GROUNDX_ADMIN_USERNAME: "00000000-0000-0000-0000-000000000000"
-    GROUNDX_AGENT_API_KEY: admin-api-key
-    GROUNDX_LICENSE_KEY: "00000000-0000-0000-0000-000000000002"
-    GROUNDX_ACCESS_KEY_ID: minio
-    GROUNDX_SECRET_ACCESS_KEY: minio123
-    MYSQL_INIT_PASSWORD: password
-    MYSQL_INIT_USER: root
-    MYSQL_USER: eyelevel
-    MYSQL_PASSWORD: password
 
 # ---------------------------------------------------------------------------
 # groundx
 # mirrors: values/values.groundx.yaml
 # ---------------------------------------------------------------------------
 groundx:
-  licenseKey: "00000000-0000-0000-0000-000000000000"
+  # licenseKey: see secret.example.yaml → secret.yaml
   mode: ingest
   cluster:
     pvClass: eyelevel-pv
@@ -302,8 +279,7 @@ notebook:
     #   https://groundx-api-eyelevel.apps.<cluster-domain>/api
     baseUrl: ""
   minio:
-    accessKey: "minio"
-    secretKey: "minio123"
+    # accessKey, secretKey: see secret.example.yaml → secret.yaml
     endpoint: ""          # e.g. https://minio-api-<namespace>.apps.<cluster-domain>
     region: "us-east-1"
     defaultBucket: "billing-artifacts"
@@ -311,9 +287,9 @@ notebook:
     dataConnections:
       enabled: true
   gitClone:
-    enabled: false
+    enabled: true
     repository: "https://github.com/johnson2500/Billing-extraction-with-GroundX.git"
-    revision: "rj_helmify"      # branch, tag, or commit SHA
+    revision: "main"      # branch, tag, or commit SHA
     targetDir: "Billing-extraction-with-GroundX"
     depth: 1
     waitTimeoutSeconds: 900

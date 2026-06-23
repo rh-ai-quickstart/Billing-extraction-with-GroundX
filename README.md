@@ -105,10 +105,19 @@ cd Billing-extraction-with-GroundX
 oc login --token=<user_token> --server=https://api.<openshift_cluster_fqdn>:6443
 ```
 
-2. **Set the GroundX API key** by copying your secret file into place:
+2. **Create your secret overrides** (required — credentials are not stored in git):
 
 ```bash
-cp <secret_with_key>.yaml values/values.groundx.secret.yaml
+cp helm/billing-workloads/secret.example.yaml helm/billing-workloads/secret.yaml
+# Edit helm/billing-workloads/secret.yaml with your credentials:
+#   - GROUNDX_ADMIN_API_KEY  — GroundX platform key (notebook client)
+#   - GROUNDX_AGENT_API_KEY  — OpenAI API key (GroundX layout/extract agents)
+```
+
+Optionally, if you add operator-level secrets later:
+
+```bash
+cp helm/billing-operators/secret.example.yaml helm/billing-operators/secret.yaml
 ```
 
 3. **Review and edit the values files** to match your environment:
@@ -132,13 +141,15 @@ oc create namespace eyelevel --dry-run=client -o yaml | oc apply -f -
 cd helm/billing-operators && helm dependency update && cd ../..
 cd helm/billing-workloads && helm dependency update && cd ../..
 
-# Phase 1: Operators
+# Phase 1: Operators (add -f ./helm/billing-operators/secret.yaml if you created one)
 helm upgrade --install billing-operators ./helm/billing-operators \
   -f ./helm/billing-operators/values.yaml -n eyelevel
 
-# Phase 2: Workloads
+# Phase 2: Workloads (secret.yaml is required)
 helm upgrade --install billing-workloads ./helm/billing-workloads \
-  -f ./helm/billing-workloads/values.yaml -n eyelevel
+  -f ./helm/billing-workloads/values.yaml \
+  -f ./helm/billing-workloads/secret.yaml \
+  -n eyelevel
 ```
 
 ### Verify the Deployment
@@ -256,7 +267,7 @@ The chart can deploy **google/gemma-3-12b-it** using the [llm-service](https://g
 
 - **Enable**: In `helm/billing-workloads/values.yaml`, `llm-service.enabled` is `true` by default and `global.models.gemma-3-12b-it` is configured.
 - **Requirements**: Nodes with NVIDIA GPUs (`nvidia.com/gpu`); the model uses the default GPU device and tolerations from the llm-service chart.
-- **Hugging Face token**: If the model is gated, set `llm-service.secret.hf_token` (e.g. via a values override or sealed secret).
+- **Hugging Face token**: If the model is gated, set `llm-service.secret.hf_token` in `helm/billing-workloads/secret.yaml`.
 - **Use with GroundX**: After deploy, the model is exposed as a KServe InferenceService. To use it for GroundX extract, set the extract agent to your cluster's endpoint for the `gemma-3-12b-it` predictor (e.g. the OpenShift route or `http://gemma-3-12b-it-predictor.<namespace>.svc.cluster.local/v1`), and set `modelId` to the served model name.
 
 To disable the LLM service, set `llm-service.enabled: false` in values.
