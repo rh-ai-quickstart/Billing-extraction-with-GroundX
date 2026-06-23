@@ -5,7 +5,6 @@ Extract structured billing data from unstructured documents using GroundX&reg; o
 ## Table of contents
 
 - [Overview](#overview)
-  - [See it in action](#see-it-in-action)
   - [Architecture](#architecture)
 - [Requirements](#requirements)
   - [Minimum hardware requirements](#minimum-hardware-requirements)
@@ -33,10 +32,6 @@ This AI quickstart demonstrates how to use **GroundX** from **EyeLevel** for bil
 
 GroundX, from EyeLevel, is an enterprise platform that eliminates LLM hallucinations by grounding AI responses in a company's specific, private data. The platform utilizes advanced computer vision to preserve the context of complex document layouts, such as nested tables and schematics, ensuring high-fidelity search and retrieval. Beyond information discovery, it functions as a powerful tool for automated data extraction, transforming unstructured files into structured, verifiable insights with direct source citations. When used with OpenShift AI on premises, customers can have complete control of their own data and where it is stored and processed.
 
-### See it in action
-
-<!-- Future: Add link to recorded demo or arcade -->
-
 ### Architecture
 
 ![Architecture showing the integration points of GroundX with OpenShift and OpenShift AI](docs/images/groundx-arch.png "GroundX architecture")
@@ -58,10 +53,10 @@ GPU with 24 GB of vRAM (optional — see [GPU configuration](#gpu-configuration-
 
 | Software                       | Version  |
 |--------------------------------|----------|
-| Red Hat OpenShift              | 4.20.5   |
-| Red Hat OpenShift Service Mesh | 2.5.11-0 |
-| Red Hat OpenShift Serverless   | 1.37.0   |
-| Red Hat OpenShift AI           | 2.25     |
+| OpenShift                      | 4.20.5   |
+| OpenShift Service Mesh         | 2.5.11-0 |
+| OpenShift Serverless           | 1.37.0   |
+| OpenShift AI                   | 2.25     |
 | Helm CLI                       | 3.17.1   |
 | GroundX                        | 2.9.92   |
 
@@ -276,7 +271,7 @@ To disable the LLM service, set `llm-service.enabled: false` in values.
 
 ## Tags
 
-- **Industry:** Financial Services
+- **Industry:** Banking and securities
 - **Product:** OpenShift AI
 - **Partner:** EyeLevel
 - **Partner product:** GroundX
