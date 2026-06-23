@@ -225,8 +225,8 @@ If you are not using the chart-managed notebook, create a workbench in OpenShift
    - Click **Create connection**:
      - Select **S3 compatible object storage**
      - **Connection name**: `Models-Storage`
-     - **Access key**: `minio`
-     - **Secret key**: `minio123`
+     - **Access key**: set in secrets.yaml file. 
+     - **Secret key**: set in secrets.yaml file. 
      - **Endpoint**: `http://minio`
      - **Region**: `us-east-1`
      - **Bucket**: `models`
