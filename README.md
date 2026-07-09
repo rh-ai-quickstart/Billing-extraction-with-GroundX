@@ -1,10 +1,10 @@
-# Extract billing data with GroundX on OpenShift AI
+# Accelerate financial and billing data extraction
 
-Extract structured billing data from unstructured documents using GroundX&reg; on Red Hat OpenShift AI&reg; with complete data control on-premises.
+Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX&reg.
 
 ## Table of contents
 
-- [Overview](#overview)
+- [Detailed Description](#detailed-description)
   - [Architecture](#architecture)
 - [Requirements](#requirements)
   - [Minimum hardware requirements](#minimum-hardware-requirements)
@@ -26,11 +26,11 @@ Extract structured billing data from unstructured documents using GroundX&reg; o
   - [Deploying Gemma 3 12B via LLM service (optional)](#deploying-gemma-3-12b-via-llm-service-optional)
 - [Tags](#tags)
 
-## Overview
+## Detailed Description
 
-This AI quickstart demonstrates how to use **GroundX** from **EyeLevel** for billing data extraction in an on-prem AI environment with OpenShift AI. You will deploy GroundX along with its supporting components (MinIO, Percona MySQL, and Strimzi Kafka) using two umbrella Helm charts, then open the included Jupyter notebook and follow the data extraction workflow.
+For many organizations, critical financial and billing information remains locked inside unstructured formats like scans, PDFs, and images. Extracting this data traditionally requires slow, error-prone manual entry or brittle, template-based OCR systems that break whenever a vendor shifts a column or alters a layout. Processing complex document structures—such as nested tables, multi-page invoices, and diverse document formats—at scale remains a highly complex technical challenge.
 
-GroundX, from EyeLevel, is an enterprise platform that eliminates LLM hallucinations by grounding AI responses in a company's specific, private data. The platform utilizes advanced computer vision to preserve the context of complex document layouts, such as nested tables and schematics, ensuring high-fidelity search and retrieval. Beyond information discovery, it functions as a powerful tool for automated data extraction, transforming unstructured files into structured, verifiable insights with direct source citations. When used with OpenShift AI on premises, customers can have complete control of their own data and where it is stored and processed.
+This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with a robust, production-ready extraction pipeline. You will deploy GroundX from EyeLevel to automate billing data extraction within a secure, on-premises AI environment powered by OpenShift AI.
 
 ### Architecture
 
@@ -56,7 +56,7 @@ GPU with 24 GB of vRAM (optional — see [GPU configuration](#gpu-configuration-
 | OpenShift                      | 4.20.5   |
 | OpenShift Service Mesh         | 2.5.11-0 |
 | OpenShift Serverless           | 1.37.0   |
-| OpenShift AI                   | 2.25     |
+| OpenShift AI                   | 3.4      |
 | Helm CLI                       | 3.17.1   |
 | GroundX                        | 2.9.92   |
 
@@ -178,7 +178,7 @@ layout:
 
 To run with a GPU, set `nvidia.com/gpu` to `'1'`. See the comments in `values/values.groundx.yaml` for details.
 
-### Uninstall
+### Delete
 
 ```bash
 # From the repo root
@@ -193,7 +193,12 @@ cd helm && make uninstall NAMESPACE=eyelevel
 
 This uninstalls the workloads chart first (clearing CRs and finalizers), then the operators chart. The namespace is preserved by default — delete it separately with `oc delete project eyelevel` if desired.
 
-## Demo GroundX
+## References
+
+- [GroundX documentation](https://docs.eyelevel.ai/documentation/fundamentals/welcome)
+- OpenShift AI documentation [v2.25](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25)
+
+## Demo billing extraction
 
 ### Create a storage bucket for models
 
@@ -250,11 +255,6 @@ If you are not using the chart-managed notebook, create a workbench in OpenShift
 1. Open the **get_started** notebook.
 2. In the `Initialize Client and Prompt Manager` section, set the required variables (OpenShift route to GroundX, API key).
 3. Save and run the notebook.
-
-## References
-
-- [GroundX documentation](https://docs.eyelevel.ai/documentation/fundamentals/welcome)
-- OpenShift AI documentation [v2.25](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25)
 
 ## Technical details
 
