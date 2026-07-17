@@ -3,6 +3,7 @@ NAMESPACE ?= eyelevel
 REPO_ROOT := $(abspath $(dir $(MAKEFILE_LIST))..)
 HELM_OPERATORS := $(REPO_ROOT)/helm/billing-operators
 HELM_WORKLOADS := $(REPO_ROOT)/helm/billing-workloads
+CLEANUP_SCRIPT := $(abspath $(dir $(MAKEFILE_LIST))scripts/cleanup-namespace.sh)
 
 OPERATORS_SECRET := $(HELM_OPERATORS)/secret.yaml
 WORKLOADS_SECRET := $(HELM_WORKLOADS)/secret.yaml
@@ -17,7 +18,7 @@ ifneq (,$(wildcard $(WORKLOADS_SECRET)))
 WORKLOADS_HELM_FLAGS += -f $(WORKLOADS_SECRET)
 endif
 
-.PHONY: install uninstall
+.PHONY: install uninstall terminate cleanup
 
 install:
 	@test -f $(WORKLOADS_SECRET) || ( \
@@ -31,18 +32,22 @@ install:
 	helm upgrade --install billing-operators $(HELM_OPERATORS) $(OPERATORS_HELM_FLAGS) -n $(NAMESPACE)
 	helm upgrade --install billing-workloads $(HELM_WORKLOADS) $(WORKLOADS_HELM_FLAGS) -n $(NAMESPACE)
 
+cleanup:
+	@chmod +x $(CLEANUP_SCRIPT)
+	@$(CLEANUP_SCRIPT) $(NAMESPACE) force
+
 uninstall:
-	oc get perconaxtradbclusters.pxc.percona.com -n $(NAMESPACE) -o name | xargs -n 1 -I {} oc patch {} -n $(NAMESPACE) -p '{"metadata":{"finalizers":[]}}' --type=merge
-	@for topic in $$(oc get kafkatopics -n $(NAMESPACE) -o name 2>/dev/null); do \
-		oc patch "$$topic" -n $(NAMESPACE) --type=merge -p '{"metadata":{"finalizers":[]}}'; \
-	done
-	helm uninstall billing-workloads -n $(NAMESPACE) --ignore-not-found || true
+	@chmod +x $(CLEANUP_SCRIPT)
+	@$(CLEANUP_SCRIPT) $(NAMESPACE) pre-helm
+	helm uninstall billing-workloads -n $(NAMESPACE) --ignore-not-found --no-hooks || true
 	helm uninstall billing-operators -n $(NAMESPACE) --ignore-not-found || true
-	# oc delete project $(NAMESPACE) --ignore-not-found || true
+	@$(CLEANUP_SCRIPT) $(NAMESPACE) post-helm
+	oc delete project $(NAMESPACE) --ignore-not-found --wait=false || true
+	@$(CLEANUP_SCRIPT) $(NAMESPACE) force
 
-
-.PHONY: terminate
-terminate:
-	# Remove finalizers from Percona PXC CRs which are stuck in terminating state
-	oc get perconaxtradbclusters.pxc.percona.com -n $(NAMESPACE) -o name | \
-		xargs -n 1 -I {} oc patch {} -n $(NAMESPACE) -p '{"metadata":{"finalizers":[]}}' --type=merge
+terminate: cleanup
+	helm uninstall billing-workloads -n $(NAMESPACE) --ignore-not-found --no-hooks || true
+	helm uninstall billing-operators -n $(NAMESPACE) --ignore-not-found || true
+	oc delete project $(NAMESPACE) --ignore-not-found --wait=false || true
+	@chmod +x $(CLEANUP_SCRIPT)
+	@$(CLEANUP_SCRIPT) $(NAMESPACE) force

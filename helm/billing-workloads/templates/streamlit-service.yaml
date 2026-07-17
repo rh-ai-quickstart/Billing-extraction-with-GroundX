@@ -1,0 +1,21 @@
+{{- if .Values.frontend.enabled }}
+# Cluster-internal Service exposing the Streamlit frontend pods
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  type: {{ .Values.frontend.service.type }}
+  ports:
+    - port: {{ .Values.frontend.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "billing-workloads.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+{{- end }}

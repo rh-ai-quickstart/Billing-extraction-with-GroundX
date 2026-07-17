@@ -57,14 +57,26 @@ spec:
               sleep 5
 
               echo "Deleting Kafka CR..."
+              oc delete kafkatopic --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
+              sleep 2
+              for topic in $(oc get kafkatopic -n "$NAMESPACE" -o name 2>/dev/null); do
+                oc patch "$topic" -n "$NAMESPACE" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
+              done
+              oc delete kafkatopic --all -n "$NAMESPACE" --wait=false --force --grace-period=0 2>/dev/null || true
+
               oc delete kafka --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
               wait_deleted kafka stream-cluster || patch_finalizers kafka stream-cluster
               wait_deleted kafkas.kafka.strimzi.io stream-cluster || patch_finalizers kafkas.kafka.strimzi.io stream-cluster
 
+              oc delete kafkanodepool --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
+              for knp in $(oc get kafkanodepool -n "$NAMESPACE" -o name 2>/dev/null); do
+                oc patch "$knp" -n "$NAMESPACE" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
+              done
+
               echo "Deleting MinIO Tenant CR..."
               oc delete tenant --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
-              wait_deleted tenant minio-cluster || patch_finalizers tenant minio-cluster
-              wait_deleted tenants.minio.min.io minio-cluster || patch_finalizers tenants.minio.min.io minio-cluster
+              wait_deleted tenant minio-tenant || patch_finalizers tenant minio-tenant
+              wait_deleted tenants.minio.min.io minio-tenant || patch_finalizers tenants.minio.min.io minio-tenant
 
               echo "Deleting Percona PXC CR..."
               oc delete pxc --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
@@ -72,5 +84,11 @@ spec:
               wait_deleted perconaxtradbclusters.pxc.percona.com db-cluster || patch_finalizers perconaxtradbclusters.pxc.percona.com db-cluster
               wait_deleted pxc db-cluster || true
               wait_deleted perconaxtradbclusters.pxc.percona.com db-cluster || true
+
+              echo "Deleting OpenShift AI notebooks..."
+              oc delete notebook --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
+              for nb in $(oc get notebook -n "$NAMESPACE" -o name 2>/dev/null); do
+                oc patch "$nb" -n "$NAMESPACE" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
+              done
 
               echo "CR cleanup complete."

@@ -134,6 +134,7 @@ groundx:
   mode: ingest
   cluster:
     pvClass: eyelevel-pv
+    pvAccessMode: ReadWriteOnce
     type: openshift
     imagePullPolicy: Always
     secrets:
@@ -190,16 +191,19 @@ groundx:
   #
   layout:
     inference:
+      deviceType: cpu
       enabled: true
       imagePullPolicy: Always
+      resources:
+        limits:
+          memory: 12Gi
+          nvidia.com/gpu: '0'
+        requests:
+          cpu: 500m
+          memory: 2Gi
+          nvidia.com/gpu: '0'
       tolerations:
-        - key: g5-gpu
-          operator: Exists
-          effect: NoSchedule
-        - key: g5-small-gpu
-          operator: Exists
-          effect: NoSchedule
-        - key: p4-gpu
+        - key: cpu-taint
           operator: Exists
           effect: NoSchedule
     api:
@@ -207,6 +211,22 @@ groundx:
         requests:
           cpu: 100m
           memory: 1Gi
+  # ── Ranker inference GPU configuration ───────────────────────────────
+  # GroundX chart defaults ranker.inference to nvidia.com/gpu: 1,
+  # deviceType: cuda, workers: 14, and memory: 1Gi (GPU holds model weights).
+  # On CPU the model loads into RAM — use fewer workers and more memory.
+  ranker:
+    inference:
+      deviceType: cpu
+      workers: 2
+      resources:
+        limits:
+          memory: 8Gi
+          nvidia.com/gpu: '0'
+        requests:
+          cpu: 1500m
+          memory: 4Gi
+          nvidia.com/gpu: '0'
   extract:
     enabled: true
     agent:
@@ -298,4 +318,53 @@ notebook:
       tag: "2.47.2"
       pullPolicy: IfNotPresent
     forceReset: false
+
+# ---------------------------------------------------------------------------
+# frontend – Streamlit UI for Billing Extraction
+# ---------------------------------------------------------------------------
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: quay.io/rh-ai-quickstart/groundx-ui
+    tag: "latest"
+    pullPolicy: Always
+    pullSecrets: []
+  service:
+    type: ClusterIP
+    port: 8501
+  route:
+    host: ""
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+  groundx:
+    secretName: "eyelevel-secret-credentials"
+    # Empty = use the in-cluster GroundX service (http://groundx.<ns>.svc.cluster.local/api).
+    # Override only to point at an external Route or a different GroundX instance.
+    baseUrl: ""
+    projectId: "" # Set to your specific GroundX project ID if needed
+  # Persist submission history (extracted data by job) across pod restarts
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    storageClass: "" # Use the cluster default when empty
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  podSecurityContext:
+    fsGroup: 1001
+  containerSecurityContext:
+    runAsUser: 1001
+    runAsGroup: 1001
+    allowPrivilegeEscalation: false
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
 

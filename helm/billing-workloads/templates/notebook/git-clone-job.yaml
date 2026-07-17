@@ -27,6 +27,8 @@ spec:
       # "Permission denied" on /opt/app-root/src.
       serviceAccountName: {{ include "billing-workloads.fullname" . }}-notebook
       restartPolicy: Never
+      # Match notebook PVC ownership (fsGroup 1001). Without this, OpenShift assigns
+      # an arbitrary UID that cannot write the shared /opt/app-root/src volume.
       {{- with .Values.notebook.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}

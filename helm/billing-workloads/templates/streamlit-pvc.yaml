@@ -1,0 +1,20 @@
+{{- if and .Values.frontend.enabled .Values.frontend.persistence.enabled }}
+# PersistentVolumeClaim for Streamlit submission history (extracted data by job)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-submissions
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  accessModes:
+    - {{ .Values.frontend.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.frontend.persistence.size }}
+  {{- with .Values.frontend.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}

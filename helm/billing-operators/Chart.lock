@@ -1,7 +1,7 @@
 dependencies:
 - name: groundx-storageclass
   repository: https://registry.groundx.ai/helm
-  version: 0.1.0
+  version: 0.1.1
 - name: pxc-operator
   repository: https://percona.github.io/percona-helm-charts/
   version: 1.20.0
@@ -10,6 +10,6 @@ dependencies:
   version: 7.1.1
 - name: strimzi-kafka-operator
   repository: oci://quay.io/strimzi-helm
-  version: 1.0.1
-digest: sha256:869c9805ab2488f05479301b38dc92a85914bbf547492b7b693618b652c479b7
-generated: "2026-06-23T09:19:29.795052-04:00"
+  version: 1.1.0
+digest: sha256:58df6bef76e99eec702c2faf7c8b9612d634ebbd55badc56b9f15da412eef5a5
+generated: "2026-07-17T11:09:58.694292-04:00"

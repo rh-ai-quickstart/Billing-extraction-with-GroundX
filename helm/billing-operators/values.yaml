@@ -61,7 +61,7 @@ minio-operator:
 # Set enabled=false if Strimzi is already installed (e.g. via OLM)
 # ---------------------------------------------------------------------------
 stream-operator:
-  enabled: false
+  enabled: false  # AMQ Streams (Strimzi) already installed via OLM on this cluster
   nodeSelector:
     node: eyelevel-node
   replicas: 1
