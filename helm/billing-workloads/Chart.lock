@@ -13,9 +13,9 @@ dependencies:
   version: 0.1.0
 - name: groundx
   repository: https://registry.groundx.ai/helm
-  version: 0.2.5
+  version: 0.2.6
 - name: llm-service
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   version: 0.5.2
-digest: sha256:3f00072277e9b1d30801111169ef61b4d2b5e70b0863e65c8e037064a92cb064
-generated: "2026-06-23T09:19:36.117132-04:00"
+digest: sha256:dd2b4db4d17ba9338bb72f0e2808bd548e153f4624a74b38652be35d2923aa56
+generated: "2026-07-17T11:10:09.261562-04:00"

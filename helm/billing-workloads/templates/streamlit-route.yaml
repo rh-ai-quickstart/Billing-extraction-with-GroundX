@@ -1,0 +1,24 @@
+{{- if and .Values.frontend.enabled .Values.global.openshift }}
+# OpenShift Route exposing the Streamlit frontend externally.
+# Edge TLS is required: the OpenShift console and browsers open Routes over
+# HTTPS; without termination the router returns 503 "Application is not available".
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+spec:
+  host: {{ .Values.frontend.route.host | default "" }}
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: {{ include "billing-workloads.fullname" . }}-frontend
+    weight: 100
+  tls:
+    termination: {{ .Values.frontend.route.tls.termination | default "edge" }}
+    insecureEdgeTerminationPolicy: {{ .Values.frontend.route.tls.insecureEdgeTerminationPolicy | default "Redirect" }}
+  wildcardPolicy: None
+{{- end }}

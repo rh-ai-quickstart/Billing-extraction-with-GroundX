@@ -7,3 +7,4 @@ __pycache__/
 
 # Helm secret overrides (copy from secret.example.yaml)
 **/secret.yaml
+*/*/secret.yaml
