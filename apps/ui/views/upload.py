@@ -99,6 +99,24 @@ def upload_page():
     """
     st.header("Upload & Process Billing Documents")
 
+    st.write(
+        """
+        This page lets you upload your own billing document (PDF, JPG or PNG), or select one of the built-in sample documents to try out.
+        Once a document is provided, it will be processed using the selected schema. The system will extract relevant financial and billing data from your unstructured document using GroundX's extraction pipeline.
+        
+        *Supported file types:* PDF, JPG, PNG  
+        *Steps performed:*
+        1. Document upload or sample selection
+        2. Document validation
+        3. Schema selection for data extraction
+        4. Extraction and preview of results
+
+        **Important Note:** This will work with the existing documents, but may not 
+        work with new documents because the schema is used may not match 
+        the new document.
+        """
+    )
+
     selected_yaml = st.session_state.get("selected_yaml_file", "simple.yaml")
     file_name = os.path.splitext(selected_yaml)[0]
     st.caption(f"Using extraction schema: **{selected_yaml}**")

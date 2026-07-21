@@ -306,7 +306,7 @@ notebook:
     dataConnections:
       enabled: true
   gitClone:
-    enabled: true
+    enabled: false
     repository: "https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git"
     revision: "main"      # branch, tag, or commit SHA
     targetDir: "Billing-extraction-with-GroundX"
