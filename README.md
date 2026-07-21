@@ -1,44 +1,59 @@
 # Accelerate financial and billing data extraction
 
+<!-- TITLE: Accelerate financial and billing data extraction -->
+
 Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX&reg.
+
+<!-- SHORT DESCRIPTION: Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX. -->
 
 ## Table of contents
 
-- [Detailed Description](#detailed-description)
-  - [Architecture](#architecture)
+- [Detailed description](#detailed-description)
+  - [What you'll do](#what-youll-do)
+  - [See it in action](#see-it-in-action)
+  - [Architecture diagrams](#architecture-diagrams)
 - [Requirements](#requirements)
   - [Minimum hardware requirements](#minimum-hardware-requirements)
   - [Minimum software requirements](#minimum-software-requirements)
   - [Required user permissions](#required-user-permissions)
 - [Deploy](#deploy)
-  - [Pre-requisites](#pre-requisites)
+  - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Verify the deployment](#verify-the-deployment)
-  - [GPU configuration for layout inference](#gpu-configuration-for-layout-inference)
-  - [Uninstall](#uninstall)
+  - [Access the UI](#access-the-ui)
+  - [Monitor deployment](#monitor-deployment)
+  - [Delete](#delete)
 - [References](#references)
-- [Demo GroundX](#demo-groundx)
-  - [Create a storage bucket for models](#create-a-storage-bucket-for-models)
-  - [Use the chart-managed Notebook (recommended)](#use-the-chart-managed-notebook-recommended)
-  - [Create a new workbench manually](#create-a-new-workbench-manually)
-  - [Run the GroundX demo](#run-the-groundx-demo)
+- [Demo billing extraction](#demo-billing-extraction)
+  - [Data Extraction UI (recommended)](#data-extraction-ui-recommended)
 - [Technical details](#technical-details)
-  - [Deploying Gemma 3 12B via LLM service (optional)](#deploying-gemma-3-12b-via-llm-service-optional)
+  - [GPU configuration for GroundX inference](#gpu-configuration-for-groundx-inference)
 - [Tags](#tags)
 
-## Detailed Description
+## Detailed description
 
 For many organizations, critical financial and billing information remains locked inside unstructured formats like scans, PDFs, and images. Extracting this data traditionally requires slow, error-prone manual entry or brittle, template-based OCR systems that break whenever a vendor shifts a column or alters a layout. Processing complex document structures—such as nested tables, multi-page invoices, and diverse document formats—at scale remains a highly complex technical challenge.
 
 This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with a robust, production-ready extraction pipeline. You will deploy GroundX from EyeLevel to automate billing data extraction within a secure, on-premises AI environment powered by OpenShift AI.
 
-### Architecture
+### What you'll do
+
+1. Deploy the GroundX stack on OpenShift (operators, MinIO, database, GroundX, and Streamlit UI)
+2. Verify the deployment — check pods and run **Infrastructure Check** in the UI
+3. Run billing extraction on a sample PDF or image via the Streamlit app
+4. Inspect structured results (account number, amount due, due date, and related fields) and review job history
+
+### See it in action
+
+See a detailed walkthrough of the UI-based quickstart application:
+[Walkthrough](./apps/ui/DETAIL_WALKTHROUGH.md)
+
+### Architecture diagrams
 
 ![Architecture showing the integration points of GroundX with OpenShift and OpenShift AI](docs/images/groundx-arch.png "GroundX architecture")
 
 ## Requirements
 
-This quickstart was developed and tested on a Red Hat OpenShift&reg; cluster with the following components and resources. This can be considered the minimum requirements.
+This quickstart was developed and tested on a Red Hat OpenShift&reg; cluster with the following components and resources. These can be considered the minimum requirements.
 
 ### Minimum hardware requirements
 
@@ -47,45 +62,57 @@ This quickstart was developed and tested on a Red Hat OpenShift&reg; cluster wit
 | Control Plane | 3   | 4    | 16          |
 | Worker        | 3   | 4    | 16          |
 
-GPU with 24 GB of vRAM (optional — see [GPU configuration](#gpu-configuration-for-layout-inference)).
-
 ### Minimum software requirements
 
-| Software                       | Version  |
-|--------------------------------|----------|
-| OpenShift                      | 4.20.5   |
-| OpenShift Service Mesh         | 2.5.11-0 |
-| OpenShift Serverless           | 1.37.0   |
-| OpenShift AI                   | 3.4      |
-| Helm CLI                       | 3.17.1   |
-| GroundX                        | 2.9.92   |
+This quickstart was tested with the following software versions:
+
+| Software                           | Version  |
+| ---------------------------------- |:---------|
+| Red Hat OpenShift                  | 4.20.5   |
+| Red Hat OpenShift Service Mesh     | 2.5.11-0 |
+| Red Hat OpenShift Serverless       | 1.37.0   |
+| Red Hat OpenShift AI               | 3.4      |
+| helm                               | 3.17.1   |
+| GroundX                            | 2.9.92   |
 
 ### Required user permissions
 
-The user performing this quickstart should have `admin` permissions in the cluster (does not require `cluster-admin`).
+The user performing this quickstart should be able to create a project and install both Helm charts. Roles differ by chart:
+
+| Chart | Required role | Purpose |
+|-------|---------------|---------|
+| `billing-operators` | **cluster-admin** (or equivalent) | Installs operators, storage class, node labels, and SCCs |
+| `billing-workloads` | **admin** (namespace-level) | Deploys GroundX, MinIO tenant, database, UI, and notebook into `eyelevel` |
+
+> [!NOTE]
+> A single `make -C helm install` runs both charts. Use an account that can install `billing-operators` (typically `cluster-admin`). If operators are already installed cluster-wide, an admin can install only the workloads chart.
 
 ## Deploy
 
-Deployment uses two Helm umbrella charts installed in sequence:
+Deployment uses two Helm umbrella charts, installed in sequence through a Makefile:
 
 | Chart | Path | Purpose |
 |-------|------|---------|
 | **billing-operators** | `helm/billing-operators/` | Operators and cluster prep (storage class, node labels, Percona operator, MinIO operator, optional Strimzi operator) |
-| **billing-workloads** | `helm/billing-workloads/` | Application workloads (database cluster, MinIO tenant, Kafka cluster, GroundX, Jupyter notebook) |
+| **billing-workloads** | `helm/billing-workloads/` | Application workloads (database cluster, MinIO tenant, Kafka cluster, GroundX, Streamlit UI, Jupyter notebook) |
 
-### Pre-requisites
+By default, GroundX layout and ranker inference run on **CPU**. Optional GPU settings are documented under [Technical details](#gpu-configuration-for-groundx-inference).
 
-The following must already be deployed and functional on the cluster:
+### Prerequisites
 
-1. Container Platform
-2. OpenShift Service Mesh
-3. OpenShift Serverless
-4. OpenShift AI
-5. Authorino
-6. Node Feature Discovery operator
-7. NVIDIA GPU operator (if using GPU for layout inference)
-8. User has `admin` permissions in the cluster
-9. The `eyelevel` project should not exist
+The steps assume the following products and tools are already available on the cluster:
+
+1. Red Hat OpenShift Container Platform
+2. Red Hat OpenShift Service Mesh
+3. Red Hat OpenShift Serverless
+4. Red Hat OpenShift AI
+5. Authorino (typically installed with OpenShift AI / Service Mesh)
+6. Helm 3.x installed locally
+7. `oc` CLI installed and authenticated
+8. The `eyelevel` project/namespace does not already exist
+
+> [!NOTE]
+> **GPU is optional.** Default GroundX inference uses CPU. Install the Node Feature Discovery and NVIDIA GPU operators only if you enable GPU inference (see [Technical details](#gpu-configuration-for-groundx-inference)).
 
 ### Installation
 
@@ -98,22 +125,28 @@ cd Billing-extraction-with-GroundX
 oc login --token=<user_token> --server=https://api.<openshift_cluster_fqdn>:6443
 ```
 
-2. **Create your secret overrides** (required — credentials are not stored in git):
+2. **Create the workloads secret file** (required — credentials are not stored in git):
 
 ```bash
 cp helm/billing-workloads/secret.example.yaml helm/billing-workloads/secret.yaml
-# Edit helm/billing-workloads/secret.yaml with your credentials:
-#   - GROUNDX_ADMIN_API_KEY  — GroundX platform key (notebook client)
-#   - GROUNDX_AGENT_API_KEY  — OpenAI API key (GroundX layout/extract agents)
 ```
 
-Optionally, if you add operator-level secrets later:
+Edit `helm/billing-workloads/secret.yaml` and set at least these keys under `groundx-secret.data`:
 
-```bash
-cp helm/billing-operators/secret.example.yaml helm/billing-operators/secret.yaml
-```
+| Key in `secret.yaml` | What it is | Used by |
+|----------------------|------------|---------|
+| `GROUNDX_ADMIN_API_KEY` | GroundX platform / admin API key | Streamlit UI (`GROUNDX_API_KEY` in the pods) |
+| `GROUNDX_AGENT_API_KEY` | OpenAI-compatible API key (not a placeholder like `sk-CHANGE_ME`) | GroundX layout and extract agents |
 
-This key is required and is used to populate the `GROUNDX_AGENT_API_KEY` field in the `eyelevel-secret-credentials` Kubernetes Secret (managed by the `groundx-secret` subchart). The Makefile will fail with an error if the variable is not set.
+> [!IMPORTANT]
+> **`GROUNDX_ADMIN_API_KEY` can be any UUID you choose** — it does not come from GroundX or another provider. Pick any value in UUID format (for example `00000000-0000-0000-0000-000000000001`) and use the same value consistently. Do **not** confuse it with `GROUNDX_AGENT_API_KEY`, which must be a real OpenAI-compatible API key.
+
+No shell environment variables are required for install. Helm merges `secret.yaml` into the chart and creates the `eyelevel-secret-credentials` Kubernetes Secret.
+
+> [!NOTE]
+> `helm/billing-operators/secret.yaml` is **NOT OPTIONAL**.
+
+`make -C helm install` only checks that `helm/billing-workloads/secret.yaml` **exists**.
 
 3. **Review and edit the values files** to match your environment:
    - `helm/billing-operators/values.yaml` — operator toggles, node labels
@@ -121,158 +154,136 @@ This key is required and is used to populate the `GROUNDX_AGENT_API_KEY` field i
 
 4. **Install using the Makefile** (recommended):
 
-**Be sure to set GROUNDX_AGENT_API_KEY env variable.**
-
 ```bash
 # From the repo root — installs operators first, then workloads
-make install
+make -C helm install
 ```
 
-Or install each chart manually:
+### Access the UI
+
+1. Open the Streamlit frontend route in the OpenShift console (**Networking → Routes**), or:
 
 ```bash
-# Create the namespace
-oc create namespace eyelevel --dry-run=client -o yaml | oc apply -f -
-
-# Update chart dependencies
-cd helm/billing-operators && helm dependency update && cd ../..
-cd helm/billing-workloads && helm dependency update && cd ../..
-
-# Phase 1: Operators (add -f ./helm/billing-operators/secret.yaml if you created one)
-helm upgrade --install billing-operators ./helm/billing-operators \
-  -f ./helm/billing-operators/values.yaml -n eyelevel
-
-# Phase 2: Workloads (secret.yaml is required)
-helm upgrade --install billing-workloads ./helm/billing-workloads \
-  -f ./helm/billing-workloads/values.yaml \
-  -f ./helm/billing-workloads/secret.yaml \
-  -n eyelevel
+oc get route -n eyelevel -l app.kubernetes.io/component=frontend \
+  -o jsonpath='https://{.items[0].spec.host}{"\n"}'
 ```
 
-### Verify the deployment
+The URL looks like `https://billing-workloads-frontend-eyelevel.<cluster_domain>/`.
+
+2. Follow the [Data Extraction UI walkthrough](#data-extraction-ui-recommended) below to run extraction in the app.
+
+![Infrastructure Check in the billing extraction UI](./docs/images/verify-infra.png)
+
+### Monitor deployment
 
 ```bash
-make get-pods
-# or
 oc get pods -n eyelevel
 ```
 
 All pods should reach `Running` (or `Completed` for one-shot Jobs).
 
-### GPU configuration for layout inference
+### Delete
 
-To disable GPU for GroundX layout inference, add the following to `helm/billing-workloads/values.yaml` under `groundx.layout.inference`:
+Remove the deployment using the Makefile:
+
+```bash
+# From the repo root — uninstalls both charts and deletes the eyelevel project
+make -C helm uninstall
+```
+
+This uninstalls the workloads chart first (clearing CRs and finalizers), then the operators chart, then deletes the `eyelevel` project.
+
+If the project remains, remove it manually:
+
+```bash
+oc delete project eyelevel
+```
+
+## References
+
+* GroundX documentation [v2.9](https://docs.eyelevel.ai/documentation/fundamentals/welcome)
+* Red Hat OpenShift AI documentation [v3.4](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.4/)
+* [Red Hat OpenShift documentation](https://docs.redhat.com/en/documentation/openshift_container_platform)
+
+## Demo billing extraction
+
+The demo is the Streamlit **Billing Extraction** application deployed with the workloads chart.
+
+### Data Extraction UI (recommended)
+
+Open the frontend as described in [Access the UI](#access-the-ui). The sidebar walks through these pages:
+
+| Page | Description |
+|------|-------------|
+| **Documentation** | What the app is, what GroundX does, and what success looks like |
+| **Infrastructure Check** | Validate SDK, credentials, schemas, and GroundX API connectivity |
+| **Upload & Process** | Select a sample bill (or upload PDF/JPG/PNG) and run extraction with `simple.yaml` |
+| **View Extracted Data** | Inspect the latest JSON and field table; download results |
+| **Job History** | Browse past submissions and reopen extracted data |
+
+Typical flow: **Infrastructure Check** → **Upload & Process** (try **AT&T Wireless**) → **View Extracted Data** → **Job History**.
+
+Screenshots and narration notes: [DETAIL_WALKTHROUGH.md](./apps/ui/DETAIL_WALKTHROUGH.md).
+
+## Technical details
+
+### GPU configuration for GroundX inference
+
+By default, the billing-workloads chart runs GroundX layout and ranker inference on CPU. There is no separate “suppress GPU” flag — the chart overrides the upstream GroundX defaults (which request a GPU) in `helm/billing-workloads/values.yaml`:
+
+| Setting | Effect |
+| --- | --- |
+| `deviceType: cpu` | Runs the container on CPU instead of CUDA |
+| `nvidia.com/gpu: '0'` | Prevents the scheduler from allocating a GPU |
+
+**Layout inference** (`groundx.layout.inference`):
 
 ```yaml
 layout:
   inference:
+    deviceType: cpu
     resources:
       limits:
         memory: 12Gi
-        nvidia.com/gpu: '0' # <-- Set to 0
+        nvidia.com/gpu: '0'
       requests:
         cpu: 500m
         memory: 2Gi
-        nvidia.com/gpu: '0' # <-- Set to 0
+        nvidia.com/gpu: '0'
 ```
 
-To run with a GPU, set `nvidia.com/gpu` to `'1'`. See the comments in `values/values.groundx.yaml` for details.
+**Ranker inference** (`groundx.ranker.inference`) — also CPU by default, with fewer workers and more memory than the GPU defaults:
 
-### Delete
-
-```bash
-# From the repo root
-make uninstall
+```yaml
+ranker:
+  inference:
+    deviceType: cpu
+    workers: 2
+    resources:
+      limits:
+        memory: 8Gi
+        nvidia.com/gpu: '0'
+      requests:
+        cpu: 1500m
+        memory: 4Gi
+        nvidia.com/gpu: '0'
 ```
 
-Or manually:
-
-```bash
-cd helm && make uninstall NAMESPACE=eyelevel
-```
-
-This uninstalls the workloads chart first (clearing CRs and finalizers), then the operators chart. The namespace is preserved by default — delete it separately with `oc delete project eyelevel` if desired.
-
-## References
-
-- [GroundX documentation](https://docs.eyelevel.ai/documentation/fundamentals/welcome)
-- OpenShift AI documentation [v2.25](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25)
-
-## Demo billing extraction
-
-### Create a storage bucket for models
-
-1. Use the MinIO console route to access MinIO's UI.
-2. Create a storage bucket called `models`.
-
-### Use the chart-managed Notebook (recommended)
-
-The billing-workloads chart creates an OpenShift AI **Notebook** and, by default, a Helm **post-install / post-upgrade Job** (`helm/billing-workloads/templates/notebook/git-clone-job.yaml`) that waits for the notebook pod to be Ready, then clones the quickstart repository into the notebook PVC under `notebook.gitClone.targetDir`.
-
-1. Configure notebook settings in `helm/billing-workloads/values.yaml`.
-2. Git clone is **enabled by default** (`notebook.gitClone.enabled: true`). To turn it off (for example, air-gapped clusters), set `notebook.gitClone.enabled: false` and clone the repo manually inside the workbench.
-3. Override clone source or branch as needed:
-   - `notebook.gitClone.repository` (default: `https://github.com/rh-ai-quickstart/Billing-extraction-with-GroundX.git`)
-   - (optional) `notebook.gitClone.revision`, `notebook.gitClone.targetDir`, `notebook.gitClone.forceReset`, `notebook.gitClone.cloneRetries`
-4. Deploy/upgrade the chart:
-
-```bash
-make install
-```
-
-5. Open the created notebook from **OpenShift AI → Workbenches**.
-
-### Create a new workbench manually
-
-If you are not using the chart-managed notebook, create a workbench in OpenShift AI:
-
-1. In OpenShift AI, enter the `eyelevel` project.
-2. Create a workbench:
-   - **Name**: `groundx-wb`
-   - **Image selection**: Jupyter | Minimal | CPU | Python 3.12
-   - **Version selection**: 2025.2
-   - **Container size**: Small
-   - **Accelerator**: None
-   - Add environment variables IMPORTANT READ:
-     - **Type**: Secret → Key / value
-       - **Key**: `GROUNDX_ADMIN_API_KEY` — **Value**: `<YOUR_GROUNDX_ADMIN_API_KEY>`
-     - **Type**: ConfigMap → Key / value
-       - **Key**: `GROUNDX_BASE_URL` — **Value**: `<GROUNDX_OPENSHIFT_ROUTE>/api`: IMPORTANT: This is set in the `values.yaml` file and needs to have /api appended.
-
-   - Click **Create connection**:
-     - Select **S3 compatible object storage**
-     - **Connection name**: `Models-Storage`
-     - **Access key**: set in secrets.yaml file. 
-     - **Secret key**: set in secrets.yaml file. 
-     - **Endpoint**: `http://minio`
-     - **Region**: `us-east-1`
-     - **Bucket**: `models`
-3. Click **Create notebook**.
-4. Clone this repo into the workbench if you disabled the chart git-clone Job (`notebook.gitClone.enabled: false`).
-
-### Run the GroundX demo
-
-1. Open the **get_started** notebook.
-2. In the `Initialize Client and Prompt Manager` section, set the required variables (OpenShift route to GroundX, API key).
-3. Save and run the notebook.
-
-## Technical details
-
-### Deploying Gemma 3 12B via LLM service (optional)
-
-The chart can deploy **google/gemma-3-12b-it** using the [llm-service](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/llm-service) from the ai-architecture-charts repo.
-
-- **Enable**: In `helm/billing-workloads/values.yaml`, `llm-service.enabled` is `true` by default and `global.models.gemma-3-12b-it` is configured.
-- **Requirements**: Nodes with NVIDIA GPUs (`nvidia.com/gpu`); the model uses the default GPU device and tolerations from the llm-service chart.
-- **Hugging Face token**: If the model is gated, set `llm-service.secret.hf_token` in `helm/billing-workloads/secret.yaml`.
-- **Use with GroundX**: After deploy, the model is exposed as a KServe InferenceService. To use it for GroundX extract, set the extract agent to your cluster's endpoint for the `gemma-3-12b-it` predictor (e.g. the OpenShift route or `http://gemma-3-12b-it-predictor.<namespace>.svc.cluster.local/v1`), and set `modelId` to the served model name.
-
-To disable the LLM service, set `llm-service.enabled: false` in values.
+To enable GPU inference, set `nvidia.com/gpu` to `'1'` and `deviceType` to `cuda` (for ranker; layout follows the same pattern). Use a GPU with roughly 24 GB of memory (for example NVIDIA A10, L40S, or A100). See the comments in `helm/billing-workloads/values.yaml` for the full GPU resource blocks. Nodes labeled for GroundX (`gpuLayout` / `gpuRanker`) must have an NVIDIA GPU available, and the NVIDIA GPU operator must be installed.
 
 ## Tags
+
+<!--
+Title: Accelerate financial and billing data extraction
+Description: Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX.
+Industry: Banking and securities
+Product: OpenShift AI
+Use case: Data extraction, Document intelligence
+Contributor org: Red Hat
+-->
 
 - **Industry:** Banking and securities
 - **Product:** OpenShift AI
 - **Partner:** EyeLevel
 - **Partner product:** GroundX
-- **Business challenge:** Data extraction
+- **Use case:** Data extraction, Document intelligence

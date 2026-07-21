@@ -5,6 +5,12 @@ HELM_OPERATORS := $(REPO_ROOT)/helm/billing-operators
 HELM_WORKLOADS := $(REPO_ROOT)/helm/billing-workloads
 CLEANUP_SCRIPT := $(abspath $(dir $(MAKEFILE_LIST))scripts/cleanup-namespace.sh)
 
+# Streamlit UI image (Quay)
+UI_IMAGE ?= quay.io/rh-ai-quickstart/groundx-ui:latest
+UI_BUILD_PLATFORM ?= linux/amd64
+UI_DOCKERFILE := $(REPO_ROOT)/Dockerfile
+UI_DEPLOYMENT ?= billing-workloads-frontend
+
 OPERATORS_SECRET := $(HELM_OPERATORS)/secret.yaml
 WORKLOADS_SECRET := $(HELM_WORKLOADS)/secret.yaml
 
@@ -18,7 +24,26 @@ ifneq (,$(wildcard $(WORKLOADS_SECRET)))
 WORKLOADS_HELM_FLAGS += -f $(WORKLOADS_SECRET)
 endif
 
-.PHONY: install uninstall terminate cleanup
+.PHONY: install uninstall terminate cleanup \
+	login-ui-quay build-ui-image push-ui-image publish-ui-image
+
+## Build / push Streamlit UI image to Quay (podman)
+
+login-ui-quay:
+	@podman login quay.io
+
+build-ui-image:
+	@echo "Building UI image: $(UI_IMAGE) for platform $(UI_BUILD_PLATFORM)"
+	@podman build --platform $(UI_BUILD_PLATFORM) -f $(UI_DOCKERFILE) -t $(UI_IMAGE) $(REPO_ROOT)
+
+push-ui-image: build-ui-image
+	@echo "Pushing UI image: $(UI_IMAGE)"
+	@podman push $(UI_IMAGE)
+
+publish-ui-image: push-ui-image
+	@echo "Restarting frontend deployment so it pulls $(UI_IMAGE)"
+	@oc rollout restart deployment/$(UI_DEPLOYMENT) -n $(NAMESPACE)
+	@oc rollout status deployment/$(UI_DEPLOYMENT) -n $(NAMESPACE) --timeout=300s
 
 install:
 	@test -f $(WORKLOADS_SECRET) || ( \
