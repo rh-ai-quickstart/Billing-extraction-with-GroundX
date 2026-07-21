@@ -16,7 +16,6 @@ Extract structured financial and billing data from unstructured documents, such 
   - [Verify the deployment](#verify-the-deployment)
   - [GPU configuration for layout inference](#gpu-configuration-for-layout-inference)
   - [Uninstall](#uninstall)
-- [References](#references)
 - [Demo GroundX](#demo-groundx)
   - [Create a storage bucket for models](#create-a-storage-bucket-for-models)
   - [Use the chart-managed Notebook (recommended)](#use-the-chart-managed-notebook-recommended)
@@ -24,6 +23,7 @@ Extract structured financial and billing data from unstructured documents, such 
   - [Run the GroundX demo](#run-the-groundx-demo)
 - [Technical details](#technical-details)
   - [Deploying Gemma 3 12B via LLM service (optional)](#deploying-gemma-3-12b-via-llm-service-optional)
+- [References](#references)
 - [Tags](#tags)
 
 ## Detailed Description
@@ -193,11 +193,6 @@ cd helm && make uninstall NAMESPACE=eyelevel
 
 This uninstalls the workloads chart first (clearing CRs and finalizers), then the operators chart. The namespace is preserved by default — delete it separately with `oc delete project eyelevel` if desired.
 
-## References
-
-- [GroundX documentation](https://docs.eyelevel.ai/documentation/fundamentals/welcome)
-- OpenShift AI documentation [v2.25](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25)
-
 ## Demo billing extraction
 
 ### Create a storage bucket for models
@@ -268,6 +263,11 @@ The chart can deploy **google/gemma-3-12b-it** using the [llm-service](https://g
 - **Use with GroundX**: After deploy, the model is exposed as a KServe InferenceService. To use it for GroundX extract, set the extract agent to your cluster's endpoint for the `gemma-3-12b-it` predictor (e.g. the OpenShift route or `http://gemma-3-12b-it-predictor.<namespace>.svc.cluster.local/v1`), and set `modelId` to the served model name.
 
 To disable the LLM service, set `llm-service.enabled: false` in values.
+
+## References
+
+- [GroundX documentation](https://docs.eyelevel.ai/documentation/fundamentals/welcome)
+- OpenShift AI documentation [v2.25](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25)
 
 ## Tags
 
