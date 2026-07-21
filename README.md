@@ -19,14 +19,17 @@ Extract structured financial and billing data from unstructured documents, such 
 - [Deploy](#deploy)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Access the UI](#access-the-ui)
-  - [Monitor deployment](#monitor-deployment)
-  - [Delete](#delete)
-- [References](#references)
-- [Demo billing extraction](#demo-billing-extraction)
-  - [Data Extraction UI (recommended)](#data-extraction-ui-recommended)
+  - [Verify the deployment](#verify-the-deployment)
+  - [GPU configuration for layout inference](#gpu-configuration-for-layout-inference)
+  - [Uninstall](#uninstall)
+- [Demo GroundX](#demo-groundx)
+  - [Create a storage bucket for models](#create-a-storage-bucket-for-models)
+  - [Use the chart-managed Notebook (recommended)](#use-the-chart-managed-notebook-recommended)
+  - [Create a new workbench manually](#create-a-new-workbench-manually)
+  - [Run the GroundX demo](#run-the-groundx-demo)
 - [Technical details](#technical-details)
-  - [GPU configuration for GroundX inference](#gpu-configuration-for-groundx-inference)
+  - [Deploying Gemma 3 12B via LLM service (optional)](#deploying-gemma-3-12b-via-llm-service-optional)
+- [References](#references)
 - [Tags](#tags)
 
 ## Detailed description
@@ -207,12 +210,6 @@ oc delete project eyelevel
 
 ## Demo billing extraction
 
-The demo is the Streamlit **Billing Extraction** application deployed with the workloads chart.
-
-### Data Extraction UI (recommended)
-
-Open the frontend as described in [Access the UI](#access-the-ui). The sidebar walks through these pages:
-
 | Page | Description |
 |------|-------------|
 | **Documentation** | What the app is, what GroundX does, and what success looks like |
@@ -270,6 +267,11 @@ ranker:
 ```
 
 To enable GPU inference, set `nvidia.com/gpu` to `'1'` and `deviceType` to `cuda` (for ranker; layout follows the same pattern). Use a GPU with roughly 24 GB of memory (for example NVIDIA A10, L40S, or A100). See the comments in `helm/billing-workloads/values.yaml` for the full GPU resource blocks. Nodes labeled for GroundX (`gpuLayout` / `gpuRanker`) must have an NVIDIA GPU available, and the NVIDIA GPU operator must be installed.
+
+## References
+
+- [GroundX documentation](https://docs.eyelevel.ai/documentation/fundamentals/welcome)
+- OpenShift AI documentation [v2.25](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.25)
 
 ## Tags
 
