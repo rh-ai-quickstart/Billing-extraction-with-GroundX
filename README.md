@@ -2,7 +2,7 @@
 
 <!-- TITLE: Accelerate financial and billing data extraction -->
 
-Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX&reg.
+Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX&reg;.
 
 <!-- SHORT DESCRIPTION: Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX. -->
 
