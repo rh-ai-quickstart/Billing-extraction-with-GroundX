@@ -2,7 +2,7 @@
 
 <!-- TITLE: Accelerate financial and billing data extraction -->
 
-Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX&reg.
+Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX&reg;.
 
 <!-- SHORT DESCRIPTION: Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX. -->
 
@@ -30,7 +30,7 @@ Extract structured financial and billing data from unstructured documents, such 
 
 For many organizations, critical financial and billing information remains locked inside unstructured formats like scans, PDFs, and images. Extracting this data traditionally requires slow, error-prone manual entry or brittle, template-based OCR systems that break whenever a vendor shifts a column or alters a layout. Processing complex document structures—such as nested tables, multi-page invoices, and diverse document formats—at scale remains a highly complex technical challenge.
 
-This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with a robust, production-ready extraction pipeline. You will deploy GroundX from EyeLevel to automate billing data extraction within a secure, on-premises AI environment powered by OpenShift AI.
+This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with a robust, production-ready extraction pipeline. You will deploy GroundX from EyeLevel to automate billing data extraction within a secure, on-premises AI environment powered by Red Hat OpenShift AI&reg;.
 
 ### See it in action
 
@@ -74,8 +74,7 @@ The user performing this quickstart should be able to create a project and insta
 | `billing-operators` | **cluster-admin** (or equivalent) | Installs operators, storage class, node labels, and SCCs |
 | `billing-workloads` | **admin** (namespace-level) | Deploys GroundX, MinIO tenant, database, UI, and notebook into `eyelevel` |
 
-> [!NOTE]
-> A single `make -C helm install` runs both charts. Use an account that can install `billing-operators` (typically `cluster-admin`). If operators are already installed cluster-wide, an admin can install only the workloads chart.
+**NOTE**: A single `make -C helm install` runs both charts. Use an account that can install `billing-operators` (typically `cluster-admin`). If operators are already installed cluster-wide, an admin can install only the workloads chart.
 
 ## Deploy
 
