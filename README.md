@@ -30,7 +30,7 @@ Extract structured financial and billing data from unstructured documents, such 
 
 For many organizations, critical financial and billing information remains locked inside unstructured formats like scans, PDFs, and images. Extracting this data traditionally requires slow, error-prone manual entry or brittle, template-based OCR systems that break whenever a vendor shifts a column or alters a layout. Processing complex document structures—such as nested tables, multi-page invoices, and diverse document formats—at scale remains a highly complex technical challenge.
 
-This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with a robust, production-ready extraction pipeline. You will deploy GroundX from EyeLevel to automate billing data extraction within a secure, on-premises AI environment powered by Red Hat OpenShift AI&reg;.
+This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with a robust, production-ready extraction pipeline. You will deploy GroundX from Valantor to automate billing data extraction within a secure, on-premises AI environment powered by Red Hat OpenShift AI&reg;.
 
 ### See it in action
 
