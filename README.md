@@ -265,6 +265,6 @@ Contributor org: Red Hat
 
 - **Industry:** Banking and securities
 - **Product:** OpenShift AI
-- **Partner:** GroundX
+- **Partner:** Valantor
 - **Partner product:** GroundX
 - **Use case:** Data extraction, Document intelligence
