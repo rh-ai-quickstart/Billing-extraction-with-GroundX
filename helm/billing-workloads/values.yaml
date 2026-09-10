@@ -36,11 +36,11 @@ db-cluster:
   backup:
     enabled: false
     nodeSelector:
-      node: eyelevel-node
+      node: groundx-node
   haproxy:
     enabled: true
     nodeSelector:
-      node: eyelevel-node
+      node: groundx-node
     resources:
       requests:
         cpu: 600m
@@ -49,20 +49,20 @@ db-cluster:
   logcollector:
     enabled: false
     nodeSelector:
-      node: eyelevel-node
+      node: groundx-node
   nodeSelector:
-    node: eyelevel-node
+    node: groundx-node
   pmm:
     enabled: false
     nodeSelector:
-      node: eyelevel-node
+      node: groundx-node
   proxysql:
     enabled: false
     nodeSelector:
-      node: eyelevel-node
+      node: groundx-node
   pxc:
     nodeSelector:
-      node: eyelevel-node
+      node: groundx-node
     persistence:
       size: 20Gi
     resources:
@@ -87,14 +87,14 @@ minio-cluster:
     containerSecurityContext: null
     name: minio-tenant
     nodeSelector:
-      node: eyelevel-node
+      node: groundx-node
     podSecurityContext: null
     securityContext: null
     pools:
       - name: minio-tenant-pool-0
         containerSecurityContext: null
         nodeSelector:
-          node: eyelevel-node
+          node: groundx-node
         podSecurityContext: null
         resources:
           requests:
@@ -103,7 +103,7 @@ minio-cluster:
         securityContext: null
         servers: 1
         size: 20Gi
-        storageClassName: eyelevel-pv
+        storageClassName: groundx-pv
         volumesPerServer: 1
 
 # ---------------------------------------------------------------------------
@@ -111,7 +111,8 @@ minio-cluster:
 # mirrors: values/values.strimzi.cluster.yaml
 # ---------------------------------------------------------------------------
 stream-cluster:
-  node: eyelevel-node
+  namespace: groundx
+  node: groundx-node
   enabled: true
   cluster:
     version: 4.1.0  # Strimzi operator supports [4.0.0, 4.1.0]
@@ -122,32 +123,34 @@ stream-cluster:
 # Credential data: copy secret.example.yaml → secret.yaml
 # ---------------------------------------------------------------------------
 groundx-secret:
-  name: eyelevel-secret-credentials
-  namespace: eyelevel
+  name: groundx-secret-credentials
+  namespace: groundx
 
 # ---------------------------------------------------------------------------
 # groundx
 # mirrors: values/values.groundx.yaml
 # ---------------------------------------------------------------------------
 groundx:
+  # Upstream chart defaults to namespace "eyelevel"; must match Helm release namespace.
+  namespace: groundx
   # licenseKey: see secret.example.yaml → secret.yaml
   mode: ingest
   cluster:
-    pvClass: eyelevel-pv
+    pvClass: groundx-pv
     pvAccessMode: ReadWriteOnce
     type: openshift
     imagePullPolicy: Always
     secrets:
-      - eyelevel-secret-credentials
+      - groundx-secret-credentials
     preProcessors:
       - processorId: 13
         type: extract
     nodeLabels:
-      cpuMemory: eyelevel-node
-      cpuOnly: eyelevel-node
-      gpuLayout: eyelevel-node
-      gpuRanker: eyelevel-node
-      gpuSummary: eyelevel-node
+      cpuMemory: groundx-node
+      cpuOnly: groundx-node
+      gpuLayout: groundx-node
+      gpuRanker: groundx-node
+      gpuSummary: groundx-node
   file:
     customDomain: minio
   groundx:
@@ -290,9 +293,9 @@ notebook:
     enabled: true
     size: 2Gi
   groundx:
-    # The API key is read from the eyelevel-secret-credentials Secret
+    # The API key is read from the groundx-secret-credentials Secret
     # (created by the groundx-secret subchart) — no need to duplicate it here.
-    secretName: "eyelevel-secret-credentials"
+    secretName: "groundx-secret-credentials"
     # Optional override for GROUNDX_BASE_URL. When empty, the chart sets an
     # in-cluster URL: http://<groundx.groundx.serviceName>.<ns>.svc.cluster.local/api
     # Set only if the notebook must use an external OpenShift Route or HTTPS URL.
@@ -339,7 +342,7 @@ frontend:
       termination: edge
       insecureEdgeTerminationPolicy: Redirect
   groundx:
-    secretName: "eyelevel-secret-credentials"
+    secretName: "groundx-secret-credentials"
     # Empty = use the in-cluster GroundX service (http://groundx.<ns>.svc.cluster.local/api).
     # Override only to point at an external Route or a different GroundX instance.
     baseUrl: ""

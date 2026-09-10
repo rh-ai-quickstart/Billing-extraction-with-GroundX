@@ -48,7 +48,7 @@ When notebook.groundx.baseUrl is unset/empty, derive the in-cluster URL from the
 same naming rules as the groundx subchart (groundx.groundx.serviceUrl):
   http://<groundx.groundx.serviceName>.<namespace>.svc.cluster.local/api
 
-Namespace: groundx.namespace, else Helm release namespace, else "eyelevel".
+Namespace: groundx.namespace, else Helm release namespace, else "groundx".
 */}}
 {{- define "billing-workloads.groundxBaseUrlForNotebook" -}}
 {{- $manual := .Values.notebook.groundx.baseUrl | default "" | trim -}}
@@ -57,7 +57,7 @@ Namespace: groundx.namespace, else Helm release namespace, else "eyelevel".
 {{- else -}}
 {{- $gxc := .Values.groundx.groundx | default dict -}}
 {{- $svc := dig "serviceName" "groundx" $gxc -}}
-{{- $ns := coalesce .Values.groundx.namespace .Release.Namespace "eyelevel" | trim -}}
+{{- $ns := coalesce .Values.groundx.namespace .Release.Namespace "groundx" | trim -}}
 {{- printf "http://%s.%s.svc.cluster.local/api" $svc $ns -}}
 {{- end -}}
 {{- end }}

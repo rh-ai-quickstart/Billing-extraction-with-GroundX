@@ -4,12 +4,12 @@ dependencies:
   version: 0.1.1
 - name: pxc-operator
   repository: https://percona.github.io/percona-helm-charts/
-  version: 1.20.0
+  version: 1.20.1
 - name: operator
   repository: https://operator.min.io/
   version: 7.1.1
 - name: strimzi-kafka-operator
   repository: oci://quay.io/strimzi-helm
-  version: 1.1.0
-digest: sha256:58df6bef76e99eec702c2faf7c8b9612d634ebbd55badc56b9f15da412eef5a5
-generated: "2026-07-17T11:09:58.694292-04:00"
+  version: 1.2.0
+digest: sha256:597266f87225888b67c705f5e9925f3b6a50c0f85e9389a41dfe5bdcc1606469
+generated: "2026-09-10T12:11:19.388434-04:00"

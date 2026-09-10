@@ -4,7 +4,7 @@ WHAT_THIS_APP_IS = """
 This is a **billing data extraction** demo that runs on OpenShift AI.
 
 You upload a utility bill or invoice (PDF or image). The app sends it through
-[GroundX](https://www.eyelevel.ai/) with an extraction schema you choose, then
+[GroundX](https://www.groundx.ai/) with an extraction schema you choose, then
 shows the result as structured fields — account number, amount due, due date,
 and so on based on the schema you choose.
 
@@ -14,7 +14,7 @@ should extract it the same way.
 """
 
 WHAT_GROUNDX_DOES = """
-GroundX (from EyeLevel) turns unstructured documents into structured data
+GroundX turns unstructured documents into structured data
 without relying on brittle OCR + regex alone.
 
 For each upload it roughly does the following:

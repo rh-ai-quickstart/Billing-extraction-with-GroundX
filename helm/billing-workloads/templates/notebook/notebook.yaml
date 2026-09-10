@@ -59,7 +59,7 @@ spec:
         - name: GROUNDX_ADMIN_API_KEY
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.notebook.groundx.secretName | default "eyelevel-secret-credentials" }}
+              name: {{ .Values.notebook.groundx.secretName | default "groundx-secret-credentials" }}
               key: GROUNDX_ADMIN_API_KEY
         - name: GROUNDX_BASE_URL
           value: {{ include "billing-workloads.groundxBaseUrlForNotebook" . | quote }}
