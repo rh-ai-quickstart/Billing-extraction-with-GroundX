@@ -6,6 +6,8 @@ Extract structured financial and billing data from unstructured documents, such 
 
 <!-- SHORT DESCRIPTION: Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX. -->
 
+<!-- SHORT DESCRIPTION: Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX. -->
+
 ## Table of contents
 
 - [Detailed description](#detailed-description)
@@ -183,7 +185,7 @@ The URL looks like `https://billing-workloads-frontend-groundx.<cluster_domain>/
 
 Typical flow: **Infrastructure Check** → **Upload & Process** (try **AT&T Wireless**) → **View Extracted Data** → **Job History**.
 
-### Delete
+If the project remains, remove it manually:
 
 Remove the deployment using the Makefile:
 

@@ -1,5 +1,5 @@
 # Install and uninstall billing-operators and billing-workloads Helm charts
-NAMESPACE ?= eyelevel
+NAMESPACE ?= groundx
 REPO_ROOT := $(abspath $(dir $(MAKEFILE_LIST))..)
 HELM_OPERATORS := $(REPO_ROOT)/helm/billing-operators
 HELM_WORKLOADS := $(REPO_ROOT)/helm/billing-workloads

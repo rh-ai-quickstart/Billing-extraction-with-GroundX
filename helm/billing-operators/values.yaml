@@ -9,7 +9,7 @@
 # groundx.layout.inference.resources (see billing-workloads/values.yaml).
 nodeLabel:
   key: node
-  value: eyelevel-node
+  value: groundx-node
 
 # Container image for the node-labeling hook Job
 job:
@@ -22,11 +22,14 @@ serviceAccount:
   clusterRole: cluster-admin
 
 # ---------------------------------------------------------------------------
-# groundx-storageclass  (no custom values needed)
-# Set enabled=false if the storageclass already exists on the cluster
+# groundx-storageclass
+# Must match billing-workloads (minio-cluster, groundx.cluster.pvClass).
+# Set enabled=false if the storageclass already exists on the cluster.
+# Override provisioner/parameters for non-AWS clusters (default is EBS).
 # ---------------------------------------------------------------------------
 groundx-storageclass:
   enabled: true
+  storageClassName: groundx-pv
   # Do not modify cluster-wide default StorageClass
   isDefaultClass: false
 
@@ -39,7 +42,7 @@ db-operator:
   enabled: true
   nameOverride: db-operator
   nodeSelector:
-    node: eyelevel-node
+    node: groundx-node
 
 # ---------------------------------------------------------------------------
 # minio-operator  (alias for minio-operator/operator)
@@ -50,7 +53,7 @@ minio-operator:
   enabled: true
   operator:
     nodeSelector:
-      node: eyelevel-node
+      node: groundx-node
     replicaCount: 1
     containerSecurityContext: null
     securityContext: null
@@ -63,13 +66,13 @@ minio-operator:
 stream-operator:
   enabled: false  # AMQ Streams (Strimzi) already installed via OLM on this cluster
   nodeSelector:
-    node: eyelevel-node
+    node: groundx-node
   replicas: 1
 
 
 operator:
   nodeSelector:
-    node: eyelevel-node
+    node: groundx-node
   replicaCount: 1
 
   containerSecurityContext: null
