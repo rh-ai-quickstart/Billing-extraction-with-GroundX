@@ -7,14 +7,11 @@ global:
 job:
   image: quay.io/openshift/origin-cli:latest
 
-# MinIO Route targets.
-minio:
-  api:
-    serviceName: minio
-    targetPort: http-minio
-  console:
-    serviceName: minio-tenant-console
-    targetPort: http-console
+# Images for Jobs / initContainers — avoid Docker Hub (rate limits on OpenShift)
+jobImages:
+  cli: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+  python: registry.redhat.io/ubi9/python-311:latest
+  shell: registry.redhat.io/ubi9/ubi-minimal:latest
 
 # ServiceAccount used by cleanup hook Jobs
 serviceAccount:
@@ -76,35 +73,60 @@ db-cluster:
     proxySize: true
 
 # ---------------------------------------------------------------------------
-# minio-cluster  (alias for minio-operator/tenant)
-# mirrors: values/values.minio.tenant.yaml
+# aws-compatible-storage (S4-backed) from ai-architecture-charts
+# Runtime: quay.io/rh-aiservices-bu/s4 — S3 API :7480, Web UI :5000
+# Chart: https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage
+# Short DNS via fullnameOverride: s4 → http://s4:7480 / Secret s4-credentials
+# Credentials / UI auth: see secret.example.yaml → secret.yaml
 # ---------------------------------------------------------------------------
-minio-cluster:
-  tenant:
-    certificate:
-      requestAutoCert: false
-    # configSecret (accessKey, secretKey): see secret.example.yaml → secret.yaml
-    containerSecurityContext: null
-    name: minio-tenant
-    nodeSelector:
-      node: groundx-node
-    podSecurityContext: null
-    securityContext: null
-    pools:
-      - name: minio-tenant-pool-0
-        containerSecurityContext: null
-        nodeSelector:
-          node: groundx-node
-        podSecurityContext: null
-        resources:
-          requests:
-            cpu: 100m
-            memory: 256Mi
-        securityContext: null
-        servers: 1
-        size: 20Gi
-        storageClassName: groundx-pv
-        volumesPerServer: 1
+aws-compatible-storage:
+  enabled: true
+  fullnameOverride: s4
+  image:
+    repository: quay.io/rh-aiservices-bu/s4
+    tag: "0.3.2"
+    pullPolicy: IfNotPresent
+  s3:
+    accessKeyId: s4admin
+    secretAccessKey: s4secret
+  auth:
+    enabled: true
+    # username / password required when auth.enabled=true — set in secret.yaml
+    username: admin
+    password: changeme
+  route:
+    enabled: true
+    s3Api:
+      enabled: false
+  storage:
+    data:
+      size: 20Gi
+      storageClass: groundx-pv
+  nodeSelector:
+    node: groundx-node
+
+# Parent chart Job: create S3 buckets (not part of the aws-compatible-storage subchart)
+awsCompatibleStorageBuckets:
+  create: true
+  names:
+    - eyelevel
+    - billing-artifacts
+  region: us-east-1
+
+# Re-signing proxy so GroundX leading-slash object keys work on S4/RGW
+# (parent-owned; GroundX targets http://s4-s3-proxy:7480)
+s4PathProxy:
+  enabled: true
+  image: registry.redhat.io/ubi9/python-311:latest
+  imagePullPolicy: IfNotPresent
+  upstream: http://s4:7480
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
 
 # ---------------------------------------------------------------------------
 # stream-cluster  (alias for groundx-strimzi-kafka-cluster)
@@ -151,8 +173,17 @@ groundx:
       gpuLayout: groundx-node
       gpuRanker: groundx-node
       gpuSummary: groundx-node
+  # Point GroundX at the path-normalizing proxy (not raw S4).
+  # Raw S4 is http://s4:7480 — used by notebook + bucket bootstrap.
+  #
+  # MUST stay serviceType "minio" (not "s3"). With "s3", GroundX uses the AWS
+  # SDK and ignores the custom endpoint → real AWS → InvalidAccessKeyId.
+  # Credentials: set groundx.file.username / password in secret.yaml.
   file:
-    customDomain: minio
+    existing:
+      serviceType: minio
+      url: http://s4-s3-proxy:7480
+      region: us-east-1
   groundx:
     serviceType: Route
   engines:
@@ -162,6 +193,7 @@ groundx:
   summary:
     existing:
       serviceType: openai-base64
+      # apiKey: set in secret.yaml (must be GROUNDX_AGENT_API_KEY / OpenAI key)
   # ── Layout inference GPU configuration ───────────────────────────────
   #
   # To make GroundX use a GPU for layout inference, add a resources block
@@ -300,9 +332,11 @@ notebook:
     # in-cluster URL: http://<groundx.groundx.serviceName>.<ns>.svc.cluster.local/api
     # Set only if the notebook must use an external OpenShift Route or HTTPS URL.
     baseUrl: ""
-  minio:
-    # accessKey, secretKey: see secret.example.yaml → secret.yaml
-    endpoint: ""          # e.g. https://minio-api-<namespace>.apps.<cluster-domain>
+  s4:
+    # Credentials default to aws-compatible-storage.s3.*. Optional overrides:
+    # accessKey / secretKey in secret.yaml → notebook.s4.*
+    # In-cluster S4 S3 API (override only if using an external Route)
+    endpoint: "http://s4:7480"
     region: "us-east-1"
     defaultBucket: "billing-artifacts"
   openshiftAI:
@@ -316,9 +350,10 @@ notebook:
     depth: 1
     cloneRetries: 5
     waitTimeoutSeconds: 900
+    # Prefer UBI over Docker Hub (alpine/git) for OpenShift pull reliability
     image:
-      repository: alpine/git
-      tag: "2.47.2"
+      repository: registry.redhat.io/ubi9/ubi-minimal
+      tag: "latest"
       pullPolicy: IfNotPresent
     forceReset: false
 

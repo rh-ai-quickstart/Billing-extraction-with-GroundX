@@ -1,0 +1,346 @@
+{{- if and (index .Values "aws-compatible-storage" "enabled") .Values.s4PathProxy.enabled }}
+{{/*
+S3 path-normalizing re-signing proxy for GroundX ↔ aws-compatible-storage (S4).
+
+GroundX's Go client PUTs object keys with a leading slash (path
+/eyelevel//file/...) while Python GETs /eyelevel/file/.... Historical MinIO
+deployments collapsed that; Ceph RGW in S4 does not. This proxy collapses // in the
+URI and re-signs SigV4 so S4 accepts the request. GroundX should target
+http://s4-s3-proxy:7480; notebooks/bootstrap can talk to s4:7480 directly.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-s4-s3-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s4-s3-proxy
+data:
+  proxy.py: |
+    #!/usr/bin/env python3
+    """Normalize // in S3 paths and re-sign SigV4 toward upstream S4.
+
+    GroundX minio-go often sends aws-chunked / streaming SigV4. We decode the
+    body, strip all signing headers, and re-sign as a plain content-sha256 PUT
+    so Ceph RGW accepts the request.
+    """
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    import hashlib
+    import os
+    import re
+    import sys
+    import urllib.error
+    import urllib.request
+
+    from botocore.auth import SigV4Auth
+    from botocore.awsrequest import AWSRequest
+    from botocore.credentials import Credentials
+
+    UPSTREAM = os.environ.get("UPSTREAM", "http://s4:7480").rstrip("/")
+    ACCESS = os.environ["AWS_ACCESS_KEY_ID"]
+    SECRET = os.environ["AWS_SECRET_ACCESS_KEY"]
+    REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    LISTEN_PORT = int(os.environ.get("LISTEN_PORT", "7480"))
+
+    SKIP_RESP_HEADERS = {
+        "transfer-encoding",
+        "connection",
+        "content-encoding",
+        "content-length",
+        "trailer",
+    }
+
+
+    def normalize_path(path: str) -> str:
+        if not path.startswith("/"):
+            path = "/" + path
+        return re.sub(r"/+", "/", path)
+
+
+    def decode_aws_chunked(raw: bytes) -> bytes:
+        """Decode aws-chunked body (hex-size;extensions\\r\\n data \\r\\n ...)."""
+        out = bytearray()
+        i = 0
+        n = len(raw)
+        while i < n:
+            line_end = raw.find(b"\r\n", i)
+            if line_end < 0:
+                raise ValueError("aws-chunked: missing chunk-size CRLF")
+            size_field = raw[i:line_end].split(b";", 1)[0].strip()
+            try:
+                size = int(size_field, 16)
+            except ValueError as exc:
+                raise ValueError(f"aws-chunked: bad size {size_field!r}") from exc
+            i = line_end + 2
+            if size == 0:
+                break
+            chunk = raw[i : i + size]
+            if len(chunk) != size:
+                raise ValueError("aws-chunked: truncated chunk")
+            out.extend(chunk)
+            i += size
+            if raw[i : i + 2] != b"\r\n":
+                raise ValueError("aws-chunked: missing chunk data CRLF")
+            i += 2
+        return bytes(out)
+
+
+    def read_body(handler: BaseHTTPRequestHandler) -> bytes:
+        length = int(handler.headers.get("Content-Length", 0) or 0)
+        raw = handler.rfile.read(length) if length else b""
+        encoding = (handler.headers.get("Content-Encoding") or "").lower()
+        sha_hdr = (handler.headers.get("X-Amz-Content-Sha256") or "").lower()
+        if encoding == "aws-chunked" or "streaming" in sha_hdr:
+            return decode_aws_chunked(raw)
+        return raw
+
+
+    def upstream_reachable() -> bool:
+        """True when S4 answers any HTTP response (auth failures still count as up)."""
+        try:
+            req = urllib.request.Request(f"{UPSTREAM}/", method="HEAD")
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                resp.read()
+            return True
+        except urllib.error.HTTPError:
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, fmt, *args):
+            sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+
+        def _send(self, status: int, headers, data: bytes):
+            self.send_response(status)
+            for k, v in headers:
+                if k.lower() in SKIP_RESP_HEADERS:
+                    continue
+                self.send_header(k, v)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            if self.command != "HEAD" and data:
+                self.wfile.write(data)
+
+        def _healthz(self):
+            # Gate Service endpoints on real S4 reachability. GroundX only waits
+            # for TCP to s4-s3-proxy; if we are Ready while S4 is down, Celery
+            # workers cache a failed MinIO client and document layout stays broken.
+            if upstream_reachable():
+                self._send(200, [("Content-Type", "text/plain")], b"ok")
+            else:
+                self._send(503, [("Content-Type", "text/plain")], b"upstream unavailable")
+
+        def _handle(self):
+            raw = self.path
+            path_only, _, query = raw.partition("?")
+            if path_only in ("/healthz", "/minio/health/live"):
+                self._healthz()
+                return
+
+            try:
+                body = read_body(self)
+            except Exception as exc:  # noqa: BLE001
+                msg = ("bad request body: %s" % exc).encode()
+                self._send(400, [("Content-Type", "text/plain")], msg)
+                return
+
+            path = normalize_path(path_only)
+            url = f"{UPSTREAM}{path}"
+            if query:
+                # Drop X-Amz-* query auth; we re-sign with headers.
+                kept = []
+                for part in query.split("&"):
+                    if not part:
+                        continue
+                    key = part.split("=", 1)[0].lower()
+                    if key.startswith("x-amz-") or key in {"awsaccesskeyid", "signature", "expires"}:
+                        continue
+                    kept.append(part)
+                if kept:
+                    url = f"{url}?{'&'.join(kept)}"
+
+            # Rebuild headers from scratch — never forward client signing headers.
+            headers = {}
+            ctype = self.headers.get("Content-Type")
+            if ctype:
+                headers["Content-Type"] = ctype
+            payload_hash = hashlib.sha256(body or b"").hexdigest()
+            headers["X-Amz-Content-Sha256"] = payload_hash
+
+            aws_req = AWSRequest(
+                method=self.command, url=url, data=body if body else None, headers=headers
+            )
+            SigV4Auth(Credentials(ACCESS, SECRET), "s3", REGION).add_auth(aws_req)
+            prepared = aws_req.prepare()
+            # botocore may return HTTPHeaderDict; flatten to plain str→str.
+            out_headers = {str(k): str(v) for k, v in prepared.headers.items()}
+            out_headers.pop("Content-Length", None)
+            out_headers.pop("content-length", None)
+
+            upstream = urllib.request.Request(
+                prepared.url,
+                data=body if body else None,
+                method=self.command,
+                headers=out_headers,
+            )
+            try:
+                with urllib.request.urlopen(upstream, timeout=300) as resp:
+                    data = b"" if self.command == "HEAD" else resp.read()
+                    self._send(resp.status, list(resp.headers.items()), data)
+            except urllib.error.HTTPError as exc:
+                data = exc.read()
+                snippet = data[:200].decode("utf-8", "replace").replace("\n", " ")
+                self.log_message(
+                    '"%s %s" %s upstream=%s body=%s',
+                    self.command,
+                    path,
+                    exc.code,
+                    url,
+                    snippet,
+                )
+                self._send(exc.code, list(exc.headers.items()), data)
+            except Exception as exc:  # noqa: BLE001
+                msg = str(exc).encode()
+                self._send(502, [("Content-Type", "text/plain")], msg)
+
+        def do_GET(self):
+            self._handle()
+
+        def do_PUT(self):
+            self._handle()
+
+        def do_POST(self):
+            self._handle()
+
+        def do_DELETE(self):
+            self._handle()
+
+        def do_HEAD(self):
+            self._handle()
+
+        def do_OPTIONS(self):
+            self._handle()
+
+
+    def main():
+        print(f"s4-s3-proxy listening on :{LISTEN_PORT} → {UPSTREAM}", flush=True)
+        ThreadingHTTPServer(("0.0.0.0", LISTEN_PORT), Handler).serve_forever()
+
+
+    if __name__ == "__main__":
+        main()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "billing-workloads.fullname" . }}-s4-s3-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s4-s3-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "billing-workloads.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: s4-s3-proxy
+  template:
+    metadata:
+      labels:
+        {{- include "billing-workloads.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: s4-s3-proxy
+      annotations:
+        # Bump when proxy.py logic changes (ConfigMap updates alone do not restart pods).
+        checksum/proxy: {{ "healthz-upstream-gate-v2" | sha256sum }}
+    spec:
+      {{- with (index .Values "aws-compatible-storage" "nodeSelector") }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: proxy
+          image: {{ .Values.s4PathProxy.image | default "registry.redhat.io/ubi9/python-311:latest" }}
+          imagePullPolicy: {{ .Values.s4PathProxy.imagePullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: s3
+              containerPort: 7480
+          env:
+            - name: HOME
+              value: /tmp
+            - name: UPSTREAM
+              value: {{ .Values.s4PathProxy.upstream | default (printf "http://%s:%s" (include "s4.fullname" .) (include "s4.apiPort" .)) | quote }}
+            - name: LISTEN_PORT
+              value: {{ include "s4.apiPort" . | quote }}
+            - name: AWS_DEFAULT_REGION
+              value: {{ .Values.awsCompatibleStorageBuckets.region | default "us-east-1" | quote }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s4.secretName" . }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s4.secretName" . }}
+                  key: AWS_SECRET_ACCESS_KEY
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              pip install --no-cache-dir -q botocore
+              exec python3 /opt/proxy/proxy.py
+          volumeMounts:
+            - name: proxy
+              mountPath: /opt/proxy
+          startupProbe:
+            # Wait until S4 answers — TCP-only let GroundX workers start too early
+            # and permanently cache a failed MinIO client (upload=None).
+            httpGet:
+              path: /healthz
+              port: s3
+            # pip install botocore on first start can take 30–60s; S4 may lag further
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: s3
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: s3
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml (.Values.s4PathProxy.resources | default dict) | nindent 12 }}
+      volumes:
+        - name: proxy
+          configMap:
+            name: {{ include "billing-workloads.fullname" . }}-s4-s3-proxy
+            defaultMode: 0555
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s4-s3-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s4-s3-proxy
+spec:
+  type: ClusterIP
+  ports:
+    - name: s3
+      port: 7480
+      targetPort: s3
+  selector:
+    {{- include "billing-workloads.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: s4-s3-proxy
+{{- end }}

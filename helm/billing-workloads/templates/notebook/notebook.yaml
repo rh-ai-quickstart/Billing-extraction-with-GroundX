@@ -35,7 +35,7 @@ spec:
         {{- if .Values.notebook.openshiftAI.dataConnections.enabled }}
         envFrom:
         - secretRef:
-            name: billing-minio-storage
+            name: billing-s4-storage
         {{- end }}
         env:
         - name: NOTEBOOK_ARGS

@@ -33,7 +33,7 @@ cleanup_hook_jobs() {
     -l app.kubernetes.io/instance=billing-workloads \
     --ignore-not-found --wait=false 2>/dev/null || true
   for job in billing-workloads-cleanup-crs billing-workloads-delete-project \
-    billing-workloads-notebook-git-clone; do
+    billing-workloads-notebook-git-clone billing-workloads-s4-create-buckets; do
     oc delete job "$job" -n "$NAMESPACE" --ignore-not-found --wait=false 2>/dev/null || true
   done
 }
@@ -55,13 +55,40 @@ cleanup_kafka() {
   patch_all_finalizers kafkanodepools.kafka.strimzi.io
 }
 
-cleanup_minio() {
-  echo "Cleaning up MinIO tenant..."
+cleanup_s4() {
+  echo "Cleaning up S4 / aws-compatible-storage resources..."
 
-  oc delete tenant --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
-  patch_finalizers tenant minio-tenant
-  patch_finalizers tenants.minio.min.io minio-tenant
-  patch_all_finalizers tenants.minio.min.io
+  # Parent path-proxy + bucket bootstrap (not part of the subchart)
+  oc delete job -n "$NAMESPACE" -l app.kubernetes.io/component=s4-bootstrap \
+    --ignore-not-found --wait=false 2>/dev/null || true
+  oc delete deploy,svc,cm -n "$NAMESPACE" -l app.kubernetes.io/component=s4-s3-proxy \
+    --ignore-not-found --wait=false 2>/dev/null || true
+  oc delete svc s4-s3-proxy -n "$NAMESPACE" --ignore-not-found --wait=false 2>/dev/null || true
+  oc delete deploy billing-workloads-s4-s3-proxy -n "$NAMESPACE" \
+    --ignore-not-found --wait=false 2>/dev/null || true
+  oc delete cm billing-workloads-s4-s3-proxy -n "$NAMESPACE" \
+    --ignore-not-found --wait=false 2>/dev/null || true
+
+  # Subchart resources (fullnameOverride: s4)
+  oc delete deploy,svc,route,cm,sa s4 -n "$NAMESPACE" \
+    --ignore-not-found --wait=false 2>/dev/null || true
+  oc delete route s4-api -n "$NAMESPACE" --ignore-not-found --wait=false 2>/dev/null || true
+  oc delete secret s4-credentials -n "$NAMESPACE" --ignore-not-found --wait=false 2>/dev/null || true
+  oc delete cm s4-config -n "$NAMESPACE" --ignore-not-found --wait=false 2>/dev/null || true
+
+  # Notebook ODH data connection
+  oc delete secret billing-s4-storage -n "$NAMESPACE" \
+    --ignore-not-found --wait=false 2>/dev/null || true
+
+  # PVCs can stick Terminating namespaces; clear finalizers then force-delete
+  for pvc in s4-data s4-local-storage; do
+    if oc get pvc "$pvc" -n "$NAMESPACE" >/dev/null 2>&1; then
+      oc patch pvc "$pvc" -n "$NAMESPACE" --type=merge \
+        -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
+      oc delete pvc "$pvc" -n "$NAMESPACE" \
+        --ignore-not-found --wait=false --force --grace-period=0 2>/dev/null || true
+    fi
+  done
 }
 
 cleanup_percona() {
@@ -94,7 +121,7 @@ cleanup_namespace_finalizers() {
   if [ "$phase" = "Terminating" ]; then
     echo "Namespace $NAMESPACE is Terminating; clearing remaining CR finalizers..."
     cleanup_kafka
-    cleanup_minio
+    cleanup_s4
     cleanup_percona
     cleanup_notebook
 
@@ -110,14 +137,14 @@ run_pre_helm() {
   cleanup_hook_jobs
   cleanup_groundx_deployments
   cleanup_kafka
-  cleanup_minio
+  cleanup_s4
   cleanup_percona
   cleanup_notebook
 }
 
 run_post_helm() {
   cleanup_kafka
-  cleanup_minio
+  cleanup_s4
   cleanup_percona
   cleanup_notebook
   cleanup_hook_jobs

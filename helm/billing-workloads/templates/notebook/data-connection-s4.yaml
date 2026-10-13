@@ -1,0 +1,24 @@
+{{- if and .Values.notebook.enabled .Values.global.openshift .Values.notebook.openshiftAI.dataConnections.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: billing-s4-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "billing-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notebook
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/managed: "true"
+  annotations:
+    opendatahub.io/connection-type: "s3"
+    openshift.io/display-name: "billing-s4-storage"
+type: Opaque
+stringData:
+  # Prefer aws-compatible-storage (s4) credentials so the data connection stays in sync
+  # with s4-credentials / GroundX file auth (override via notebook.s4.* if needed).
+  AWS_ACCESS_KEY_ID: {{ .Values.notebook.s4.accessKey | default (index .Values "aws-compatible-storage" "s3" "accessKeyId") | quote }}
+  AWS_SECRET_ACCESS_KEY: {{ .Values.notebook.s4.secretKey | default (index .Values "aws-compatible-storage" "s3" "secretAccessKey") | quote }}
+  AWS_S3_ENDPOINT: {{ .Values.notebook.s4.endpoint | default (printf "http://%s:%s" (include "s4.fullname" .) (include "s4.apiPort" .)) | quote }}
+  AWS_DEFAULT_REGION: {{ .Values.notebook.s4.region | default "us-east-1" | quote }}
+  AWS_S3_BUCKET: {{ .Values.notebook.s4.defaultBucket | default "billing-artifacts" | quote }}
+{{- end }}

@@ -17,12 +17,6 @@ dependencies:
     version: "*"
     condition: db-operator.enabled
 
-  - name: operator
-    alias: minio-operator
-    repository: https://operator.min.io/
-    version: "*"
-    condition: minio-operator.enabled
-
   - name: strimzi-kafka-operator
     alias: stream-operator
     repository: oci://quay.io/strimzi-helm

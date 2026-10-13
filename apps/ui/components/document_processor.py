@@ -233,6 +233,11 @@ class DocumentProcessor:
                 last_status = status
 
             if status in _COMPLETE_STATES:
+                error_msg = self._error_message_from_status(res)
+                if error_msg:
+                    raise DocumentProcessorError(
+                        f"Document processing failed: {error_msg}"
+                    )
                 if not document_id:
                     raise DocumentProcessorError(
                         "Processing completed but no document_id was returned."
@@ -240,8 +245,10 @@ class DocumentProcessor:
                 return document_id
 
             if status in _ERROR_STATES:
+                error_msg = self._error_message_from_status(res)
+                detail = f": {error_msg}" if error_msg else ""
                 raise DocumentProcessorError(
-                    f"Document processing failed with status '{status}'."
+                    f"Document processing failed with status '{status}'{detail}."
                 )
 
             if time.monotonic() >= deadline:
@@ -260,6 +267,28 @@ class DocumentProcessor:
         for phase in (progress.complete, progress.processing):
             if phase and phase.documents:
                 return phase.documents[0].document_id
+        return None
+
+    @staticmethod
+    def _error_message_from_status(res) -> Optional[str]:
+        """GroundX often returns status=complete with docs only under progress.errors."""
+        ingest = getattr(res, "ingest", None)
+        if ingest is None:
+            return None
+        status_message = getattr(ingest, "status_message", None) or getattr(
+            ingest, "statusMessage", None
+        )
+        progress = getattr(ingest, "progress", None)
+        errors = getattr(progress, "errors", None) if progress else None
+        if errors and getattr(errors, "documents", None):
+            doc = errors.documents[0]
+            doc_msg = getattr(doc, "status_message", None) or getattr(
+                doc, "statusMessage", None
+            )
+            if doc_msg:
+                return str(doc_msg)
+        if status_message:
+            return str(status_message)
         return None
 
     def download_extract(self, document_id: str) -> Dict[str, Any]:

@@ -73,11 +73,6 @@ spec:
                 oc patch "$knp" -n "$NAMESPACE" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
               done
 
-              echo "Deleting MinIO Tenant CR..."
-              oc delete tenant --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
-              wait_deleted tenant minio-tenant || patch_finalizers tenant minio-tenant
-              wait_deleted tenants.minio.min.io minio-tenant || patch_finalizers tenants.minio.min.io minio-tenant
-
               echo "Deleting Percona PXC CR..."
               oc delete pxc --all -n "$NAMESPACE" --wait=false 2>/dev/null || true
               wait_deleted pxc db-cluster || patch_finalizers pxc db-cluster

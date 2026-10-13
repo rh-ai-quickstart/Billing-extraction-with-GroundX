@@ -12,11 +12,14 @@ dependencies:
     repository: https://percona.github.io/percona-helm-charts/
     version: "*"
 
-  # minio-operator/tenant  (release alias: minio-cluster)
-  - name: tenant
-    alias: minio-cluster
-    repository: https://operator.min.io/
-    version: "*"
+  # Shared aws-compatible-storage chart (S4-backed) from ai-architecture-charts.
+  # fullnameOverride: s4 → short DNS http://s4:7480 / Secret s4-credentials.
+  # Source: https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage
+  # After publish, prefer: repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+  - name: aws-compatible-storage
+    version: 0.1.0
+    repository: "https://rh-ai-quickstart.github.io/ai-architecture-charts"
+    condition: aws-compatible-storage.enabled
 
   # groundx/groundx-strimzi-kafka-cluster  (release alias: stream-cluster)
   - name: groundx-strimzi-kafka-cluster

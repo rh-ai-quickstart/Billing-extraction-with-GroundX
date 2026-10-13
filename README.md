@@ -2,15 +2,14 @@
 
 <!-- TITLE: Accelerate financial and billing data extraction -->
 
-Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX&reg;.
-
-<!-- SHORT DESCRIPTION: Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX. -->
+Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX&reg.
 
 <!-- SHORT DESCRIPTION: Extract structured financial and billing data from unstructured documents, such as PDFs or images, using GroundX. -->
 
 ## Table of contents
 
 - [Detailed description](#detailed-description)
+  - [What you'll do](#what-youll-do)
   - [See it in action](#see-it-in-action)
   - [Architecture diagrams](#architecture-diagrams)
 - [Requirements](#requirements)
@@ -20,10 +19,12 @@ Extract structured financial and billing data from unstructured documents, such 
 - [Deploy](#deploy)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
+  - [Access the UI](#access-the-ui)
   - [Monitor deployment](#monitor-deployment)
-  - [Demo billing extraction](#demo-billing-extraction)
   - [Delete](#delete)
 - [References](#references)
+- [Demo billing extraction](#demo-billing-extraction)
+  - [Data Extraction UI (recommended)](#data-extraction-ui-recommended)
 - [Technical details](#technical-details)
   - [GPU configuration for GroundX inference](#gpu-configuration-for-groundx-inference)
 - [Tags](#tags)
@@ -33,6 +34,13 @@ Extract structured financial and billing data from unstructured documents, such 
 For many organizations, critical financial and billing information remains locked inside unstructured formats like scans, PDFs, and images. Extracting this data traditionally requires slow, error-prone manual entry or brittle, template-based OCR systems that break whenever a vendor shifts a column or alters a layout. Processing complex document structures—such as nested tables, multi-page invoices, and diverse document formats—at scale remains a highly complex technical challenge.
 
 This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with a robust, production-ready extraction pipeline. You will deploy GroundX from Valantor to automate billing data extraction within a secure, on-premises AI environment powered by Red Hat OpenShift AI&reg;.
+
+### What you'll do
+
+1. Deploy the GroundX stack on OpenShift (operators, S4 object storage, database, GroundX, and Streamlit UI)
+2. Verify the deployment — check pods and run **Infrastructure Check** in the UI
+3. Run billing extraction on a sample PDF or image via the Streamlit app
+4. Inspect structured results (account number, amount due, due date, and related fields) and review job history
 
 ### See it in action
 
@@ -74,9 +82,10 @@ The user performing this quickstart should be able to create a project and insta
 | Chart | Required role | Purpose |
 |-------|---------------|---------|
 | `billing-operators` | **cluster-admin** (or equivalent) | Installs operators, storage class, node labels, and SCCs |
-| `billing-workloads` | **admin** (namespace-level) | Deploys GroundX, MinIO tenant, database, UI, and notebook into `groundx` |
+| `billing-workloads` | **admin** (namespace-level) | Deploys GroundX, S4 storage, database, UI, and notebook into `groundx` |
 
-**NOTE**: A single `make -C helm install` runs both charts. Use an account that can install `billing-operators` (typically `cluster-admin`). If operators are already installed cluster-wide, an admin can install only the workloads chart.
+> [!NOTE]
+> A single `make -C helm install` runs both charts. Use an account that can install `billing-operators` (typically `cluster-admin`). If operators are already installed cluster-wide, an admin can install only the workloads chart.
 
 ## Deploy
 
@@ -84,10 +93,22 @@ Deployment uses two Helm umbrella charts, installed in sequence through a Makefi
 
 | Chart | Path | Purpose |
 |-------|------|---------|
-| **billing-operators** | `helm/billing-operators/` | Operators and cluster prep (storage class, node labels, Percona operator, MinIO operator, optional Strimzi operator) |
-| **billing-workloads** | `helm/billing-workloads/` | Application workloads (database cluster, MinIO tenant, Kafka cluster, GroundX, Streamlit UI, Jupyter notebook) |
+| **billing-operators** | `helm/billing-operators/` | Operators and cluster prep (storage class, node labels, Percona operator, optional Strimzi operator) |
+| **billing-workloads** | `helm/billing-workloads/` | Application workloads (database cluster, [aws-compatible-storage (S4)](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage), Kafka cluster, GroundX, Streamlit UI, Jupyter notebook) |
 
 By default, GroundX layout and ranker inference run on **CPU**. Optional GPU settings are documented under [Technical details](#gpu-configuration-for-groundx-inference).
+
+Object storage is provided by the shared **[aws-compatible-storage](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage)** Helm chart (S4-backed, S3-compatible):
+
+| Consumer | Endpoint / resource |
+|----------|---------------------|
+| In-cluster S3 API | `http://s4:7480` |
+| GroundX (via path proxy) | `http://s4-s3-proxy:7480` |
+| S4 web UI Route | Route name `s4` (port 5000 / `/api`) |
+| Credentials Secret | `s4-credentials` (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) |
+| Bootstrap buckets | `eyelevel`, `billing-artifacts` (parent Job) |
+
+External S3 API Route (`s4-api`) is disabled by default (`aws-compatible-storage.route.s3Api.enabled: false`).
 
 ### Prerequisites
 
@@ -150,19 +171,9 @@ No shell environment variables are required for install. Helm merges `secret.yam
 make -C helm install
 ```
 
-### Monitor deployment
+### Access the UI
 
-```bash
-oc get pods -n groundx
-```
-
-All pods should reach `Running` (or `Completed` for one-shot Jobs).
-
-### Demo billing extraction
-
-#### Access the UI
-
-1. Open the frontend UI route in the OpenShift console (**Networking → Routes**), or:
+1. Open the Streamlit frontend route in the OpenShift console (**Networking → Routes**), or:
 
 ```bash
 oc get route -n groundx -l app.kubernetes.io/component=frontend \
@@ -171,21 +182,19 @@ oc get route -n groundx -l app.kubernetes.io/component=frontend \
 
 The URL looks like `https://billing-workloads-frontend-groundx.<cluster_domain>/`.
 
-2. Follow the [Data Extraction UI walkthrough](./apps/ui/DETAIL_WALKTHROUGH.md) below to run extraction in the app.
+2. Follow the [Data Extraction UI walkthrough](#data-extraction-ui-recommended) below to run extraction in the app.
 
 ![Infrastructure Check in the billing extraction UI](./docs/images/verify-infra.png)
 
-| Page | Description |
-|------|-------------|
-| **Documentation** | What the app is, what GroundX does, and what success looks like |
-| **Infrastructure Check** | Validate SDK, credentials, schemas, and GroundX API connectivity |
-| **Upload & Process** | Select a sample bill (or upload PDF/JPG/PNG) and run extraction with `simple.yaml` |
-| **View Extracted Data** | Inspect the latest JSON and field table; download results |
-| **Job History** | Browse past submissions and reopen extracted data |
+### Monitor deployment
 
-Typical flow: **Infrastructure Check** → **Upload & Process** (try **AT&T Wireless**) → **View Extracted Data** → **Job History**.
+```bash
+oc get pods -n groundx
+```
 
-If the project remains, remove it manually:
+All pods should reach `Running` (or `Completed` for one-shot Jobs).
+
+### Delete
 
 Remove the deployment using the Makefile:
 
@@ -202,11 +211,25 @@ If the project remains, remove it manually:
 oc delete project groundx
 ```
 
-## References
+## Demo billing extraction
 
-* GroundX documentation [v2.9](https://docs.groundx.ai/documentation/fundamentals/welcome)
-* Red Hat OpenShift AI documentation [v3.4](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.4/)
-* [Red Hat OpenShift documentation](https://docs.redhat.com/en/documentation/openshift_container_platform)
+The demo is the Streamlit **Billing Extraction** application deployed with the workloads chart.
+
+### Data Extraction UI (recommended)
+
+Open the frontend as described in [Access the UI](#access-the-ui). The sidebar walks through these pages:
+
+| Page | Description |
+|------|-------------|
+| **Documentation** | What the app is, what GroundX does, and what success looks like |
+| **Infrastructure Check** | Validate SDK, credentials, schemas, and GroundX API connectivity |
+| **Upload & Process** | Select a sample bill (or upload PDF/JPG/PNG) and run extraction with `simple.yaml` |
+| **View Extracted Data** | Inspect the latest JSON and field table; download results |
+| **Job History** | Browse past submissions and reopen extracted data |
+
+Typical flow: **Infrastructure Check** → **Upload & Process** (try **AT&T Wireless**) → **View Extracted Data** → **Job History**.
+
+Screenshots and narration notes: [DETAIL_WALKTHROUGH.md](./apps/ui/DETAIL_WALKTHROUGH.md).
 
 ## Technical details
 
@@ -253,6 +276,14 @@ ranker:
 ```
 
 To enable GPU inference, set `nvidia.com/gpu` to `'1'` and `deviceType` to `cuda` (for ranker; layout follows the same pattern). Use a GPU with roughly 24 GB of memory (for example NVIDIA A10, L40S, or A100). See the comments in `helm/billing-workloads/values.yaml` for the full GPU resource blocks. Nodes labeled for GroundX (`gpuLayout` / `gpuRanker`) must have an NVIDIA GPU available, and the NVIDIA GPU operator must be installed.
+
+## References
+
+- [GroundX documentation](https://docs.eyelevel.ai/documentation/fundamentals/welcome)
+- [aws-compatible-storage Helm chart (ai-architecture-charts)](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage)
+- [S4 (Super Simple Storage Service)](https://github.com/rh-aiservices-bu/s4)
+- OpenShift AI documentation [v3.4](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.4/)
+- [Red Hat OpenShift documentation](https://docs.redhat.com/en/documentation/openshift_container_platform)
 
 ## Tags
 

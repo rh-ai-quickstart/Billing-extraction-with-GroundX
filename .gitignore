@@ -4,7 +4,9 @@ __pycache__/
 
 .tz
 *.tgz
+# Keep Helm dependency packages (Chart.lock companions) trackable
+!helm/**/charts/*.tgz
 
-# Helm secret overrides (copy from secret.example.yaml)
-**/secret.yaml
-*/*/secret.yaml
+# Helm secret overlays (copy from secret.example.yaml) — not chart templates
+helm/*/secret.yaml
+!**/charts/**/templates/secret.yaml

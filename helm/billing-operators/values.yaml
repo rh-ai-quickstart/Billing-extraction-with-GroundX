@@ -23,7 +23,7 @@ serviceAccount:
 
 # ---------------------------------------------------------------------------
 # groundx-storageclass
-# Must match billing-workloads (minio-cluster, groundx.cluster.pvClass).
+# Must match billing-workloads (aws-compatible-storage.storage.data.storageClass, groundx.cluster.pvClass).
 # Set enabled=false if the storageclass already exists on the cluster.
 # Override provisioner/parameters for non-AWS clusters (default is EBS).
 # ---------------------------------------------------------------------------
@@ -45,20 +45,6 @@ db-operator:
     node: groundx-node
 
 # ---------------------------------------------------------------------------
-# minio-operator  (alias for minio-operator/operator)
-# mirrors: values/values.minio.operator.yaml
-# Set enabled=false if MinIO operator is already installed (e.g. via OLM)
-# ---------------------------------------------------------------------------
-minio-operator:
-  enabled: true
-  operator:
-    nodeSelector:
-      node: groundx-node
-    replicaCount: 1
-    containerSecurityContext: null
-    securityContext: null
-
-# ---------------------------------------------------------------------------
 # stream-operator  (alias for strimzi-kafka-operator)
 # mirrors: values/values.strimzi.operator.yaml
 # Set enabled=false if Strimzi is already installed (e.g. via OLM)
@@ -68,12 +54,3 @@ stream-operator:
   nodeSelector:
     node: groundx-node
   replicas: 1
-
-
-operator:
-  nodeSelector:
-    node: groundx-node
-  replicaCount: 1
-
-  containerSecurityContext: null
-  securityContext: null

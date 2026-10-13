@@ -83,6 +83,11 @@ spec:
             - -c
             - |
               set -eu
+              # UBI minimal has no git by default — avoid Docker Hub alpine/git pulls
+              if ! command -v git >/dev/null 2>&1; then
+                microdnf install -y git >/dev/null
+                microdnf clean all >/dev/null || true
+              fi
               DEST="/opt/app-root/src/{{ .Values.notebook.gitClone.targetDir }}"
               REV="{{ .Values.notebook.gitClone.revision }}"
               REPO="{{ $repo }}"

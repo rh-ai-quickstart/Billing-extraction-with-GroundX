@@ -2,9 +2,9 @@ dependencies:
 - name: pxc-db
   repository: https://percona.github.io/percona-helm-charts/
   version: 1.20.0
-- name: tenant
-  repository: https://operator.min.io/
-  version: 7.1.1
+- name: aws-compatible-storage
+  repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+  version: 0.1.0
 - name: groundx-strimzi-kafka-cluster
   repository: https://registry.groundx.ai/helm
   version: 0.1.1
@@ -17,5 +17,5 @@ dependencies:
 - name: llm-service
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   version: 0.5.2
-digest: sha256:dd2b4db4d17ba9338bb72f0e2808bd548e153f4624a74b38652be35d2923aa56
-generated: "2026-07-17T11:10:09.261562-04:00"
+digest: sha256:3a040dc0860c3adf3a9beb4d28bcde982f76f0d5d8940f6ad72ada5d2f39a89a
+generated: "2026-09-30T13:34:46.168821-04:00"
