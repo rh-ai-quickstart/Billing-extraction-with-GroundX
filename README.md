@@ -19,7 +19,6 @@ Extract structured financial and billing data from unstructured documents, such 
 - [Deploy](#deploy)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Optional direct S4 access](#optional-direct-s4-access)
   - [Access the UI](#access-the-ui)
   - [Monitor deployment](#monitor-deployment)
   - [Delete](#delete)
@@ -111,9 +110,8 @@ Object storage is provided by the shared **[aws-compatible-storage](https://gith
 
 External S3 API Route (`s4-api`) is disabled by default (`aws-compatible-storage.route.s3Api.enabled: false`).
 
-GroundX chart and images 0.2.8 or later use the native `s4` storage client.
-The compatibility proxy remains enabled by default, and bucket policies are
-unchanged unless `awsCompatibleStorageBuckets.publicRead` is explicitly enabled.
+GroundX uses the native `s4` storage client, requiring GroundX chart and images
+0.2.8 or later. The existing proxy handles file reads without changing bucket permissions.
 
 ### Prerequisites
 
@@ -175,41 +173,6 @@ No shell environment variables are required for install. Helm merges `secret.yam
 # From the repo root — installs operators first, then workloads
 make -C helm install
 ```
-
-### Optional direct S4 access
-
-With GroundX 0.2.8 or later, `s4PathProxy.enabled: false` routes the existing
-`s4-s3-proxy:7480` Service directly to S4, keeping saved document URLs unchanged.
-Unsigned extraction image and file-link reads then need an appropriate bucket
-policy. For an unprotected demo bucket, `awsCompatibleStorageBuckets.publicRead: true`
-adds anonymous `s3:GetObject` on the GroundX bucket only, retaining existing
-policy statements. It does not grant anonymous writes or alter `billing-artifacts`.
-Keep this flag false for protected file access or a separately managed policy.
-Disabling the flag does not revoke previously granted access.
-
-For an existing S4 quickstart, prepare the read policy before bypassing the proxy.
-Use the existing credentials and all deployment-specific values files in both
-upgrades. The S4 volume, credentials and storage URL must remain unchanged:
-
-```bash
-helm dependency update helm/billing-workloads
-oc delete job billing-workloads-s4-create-buckets -n groundx --ignore-not-found
-helm upgrade billing-workloads helm/billing-workloads -n groundx \
-  -f helm/billing-workloads/values.yaml -f helm/billing-workloads/secret.yaml \
-  --set s4PathProxy.enabled=true --set awsCompatibleStorageBuckets.publicRead=true
-oc wait -n groundx --for=condition=complete \
-  job/billing-workloads-s4-create-buckets --timeout=300s
-
-# Continue only after the Job succeeds and existing document links still work.
-helm upgrade billing-workloads helm/billing-workloads -n groundx \
-  -f helm/billing-workloads/values.yaml -f helm/billing-workloads/secret.yaml \
-  --set s4PathProxy.enabled=false --set awsCompatibleStorageBuckets.publicRead=true
-```
-
-This switches routing to the same store; it does not copy data. Normal GroundX
-image rollouts still apply. To restore proxy routing, repeat the upgrade with
-`s4PathProxy.enabled=true`. Validate a new extraction and existing source, X-Ray
-and page-image links on OpenShift before deploying direct routing.
 
 ### Access the UI
 

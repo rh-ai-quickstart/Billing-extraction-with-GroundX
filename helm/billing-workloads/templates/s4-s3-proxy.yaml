@@ -1,5 +1,4 @@
-{{- if (index .Values "aws-compatible-storage" "enabled") }}
-{{- if .Values.s4PathProxy.enabled }}
+{{- if and (index .Values "aws-compatible-storage" "enabled") .Values.s4PathProxy.enabled }}
 {{/*
 S3 path-normalizing re-signing proxy for GroundX ↔ aws-compatible-storage (S4).
 
@@ -326,7 +325,6 @@ spec:
           configMap:
             name: {{ include "billing-workloads.fullname" . }}-s4-s3-proxy
             defaultMode: 0555
-{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -341,16 +339,8 @@ spec:
   ports:
     - name: s3
       port: 7480
-      {{- if .Values.s4PathProxy.enabled }}
       targetPort: s3
-      {{- else }}
-      targetPort: s3-api
-      {{- end }}
   selector:
-    {{- if .Values.s4PathProxy.enabled }}
     {{- include "billing-workloads.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: s4-s3-proxy
-    {{- else }}
-    {{- include "aws-compatible-storage.selectorLabels" (index .Subcharts "aws-compatible-storage") | nindent 4 }}
-    {{- end }}
 {{- end }}

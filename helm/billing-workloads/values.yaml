@@ -112,12 +112,9 @@ awsCompatibleStorageBuckets:
     - eyelevel
     - billing-artifacts
   region: us-east-1
-  # Optionally let file and image links open without storage credentials.
-  # Existing permissions are kept. Leave false when file protection is enabled.
-  publicRead: false
 
-# Keep the existing proxy by default. Turning it off connects directly to S4
-# without changing saved file links. See README for the required read permissions.
+# Re-signing proxy so GroundX leading-slash object keys work on S4/RGW
+# (parent-owned; GroundX targets http://s4-s3-proxy:7480)
 s4PathProxy:
   enabled: true
   image: registry.redhat.io/ubi9/python-311:latest
@@ -176,8 +173,7 @@ groundx:
       gpuLayout: groundx-node
       gpuRanker: groundx-node
       gpuSummary: groundx-node
-  # S4 requires GroundX 0.2.8 or later. Keep this address so previously uploaded
-  # files still open.
+  # Use the native S4 client (GroundX 0.2.8 or later) through the existing proxy.
   # Credentials: set groundx.file.username / password in secret.yaml.
   file:
     existing:

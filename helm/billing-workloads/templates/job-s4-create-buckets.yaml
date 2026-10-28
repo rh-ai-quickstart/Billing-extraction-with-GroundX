@@ -1,7 +1,4 @@
 {{- if and (index .Values "aws-compatible-storage" "enabled") .Values.awsCompatibleStorageBuckets.create }}
-{{- if and .Values.awsCompatibleStorageBuckets.publicRead .Values.groundx.fileAccess.enabled }}
-{{- fail "awsCompatibleStorageBuckets.publicRead must be false when groundx.fileAccess.enabled is true; protected buckets must stay private" }}
-{{- end }}
 {{/*
 Create GroundX / notebook buckets on aws-compatible-storage (S4).
 Regular Job (not a Helm hook) so it runs with the release — same pattern as
@@ -80,15 +77,12 @@ spec:
               pip install --no-cache-dir -q boto3
               echo "Creating buckets on ${S4_ENDPOINT}..."
               python3 << 'EOF'
-              import json, os, sys, time
+              import os, sys, time
               import boto3
               from botocore.client import Config
-              from botocore.exceptions import ClientError
 
               endpoint = os.environ["S4_ENDPOINT"]
               buckets = {{ .Values.awsCompatibleStorageBuckets.names | default (list "eyelevel" "billing-artifacts") | toJson }}
-              groundx_bucket = {{ .Values.groundx.file.bucketName | default "eyelevel" | toJson }}
-              public_read = {{ .Values.awsCompatibleStorageBuckets.publicRead | ternary "True" "False" }}
               s3 = boto3.client(
                   "s3",
                   endpoint_url=endpoint,
@@ -118,26 +112,6 @@ spec:
                           print(f"Creating bucket {bucket}...")
                           s3.create_bucket(Bucket=bucket)
                           print(f"Created {bucket}")
-                      if public_read and bucket == groundx_bucket:
-                          grant = {
-                              "Effect": "Allow",
-                              "Principal": {"AWS": ["*"]},
-                              "Action": ["s3:GetObject"],
-                              "Resource": [f"arn:aws:s3:::{bucket}/*"],
-                          }
-                          try:
-                              policy = json.loads(s3.get_bucket_policy(Bucket=bucket)["Policy"])
-                          except ClientError as e:
-                              if e.response["Error"]["Code"] not in ("NoSuchBucketPolicy", "NoSuchPolicy"):
-                                  raise
-                              policy = {"Version": "2012-10-17", "Statement": []}
-                          statements = policy.get("Statement", [])
-                          if not isinstance(statements, list):
-                              statements = [statements]
-                          if grant not in statements:
-                              policy["Statement"] = statements + [grant]
-                              s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps(policy))
-                          print(f"Enabled anonymous object reads on {bucket}")
                   print("S4 bucket bootstrap complete.")
                   for b in s3.list_buckets().get("Buckets", []):
                       print(f"  - {b['Name']}")
