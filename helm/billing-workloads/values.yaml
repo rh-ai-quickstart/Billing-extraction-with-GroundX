@@ -112,11 +112,14 @@ awsCompatibleStorageBuckets:
     - eyelevel
     - billing-artifacts
   region: us-east-1
+  # Anonymous GetObject on the GroundX demo bucket only, not billing-artifacts.
+  # Disable when configuring GroundX protected file access.
+  publicRead: true
 
-# Re-signing proxy so GroundX leading-slash object keys work on S4/RGW
-# (parent-owned; GroundX targets http://s4-s3-proxy:7480)
+# Optional compatibility proxy for staged upgrades. GroundX 0.2.8 supports S4
+# directly. The s4-s3-proxy Service keeps its name so stored file URLs survive.
 s4PathProxy:
-  enabled: true
+  enabled: false
   image: registry.redhat.io/ubi9/python-311:latest
   imagePullPolicy: IfNotPresent
   upstream: http://s4:7480
@@ -173,15 +176,12 @@ groundx:
       gpuLayout: groundx-node
       gpuRanker: groundx-node
       gpuSummary: groundx-node
-  # Point GroundX at the path-normalizing proxy (not raw S4).
-  # Raw S4 is http://s4:7480 — used by notebook + bucket bootstrap.
-  #
-  # MUST stay serviceType "minio" (not "s3"). With "s3", GroundX uses the AWS
-  # SDK and ignores the custom endpoint → real AWS → InvalidAccessKeyId.
+  # Native S4 requires GroundX chart/images 0.2.8 or later. Keep the historical
+  # Service hostname because GroundX saves full object URLs with documents.
   # Credentials: set groundx.file.username / password in secret.yaml.
   file:
     existing:
-      serviceType: minio
+      serviceType: s4
       url: http://s4-s3-proxy:7480
       region: us-east-1
   groundx:
