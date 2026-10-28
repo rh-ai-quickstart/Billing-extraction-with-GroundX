@@ -112,12 +112,12 @@ awsCompatibleStorageBuckets:
     - eyelevel
     - billing-artifacts
   region: us-east-1
-  # Opt-in anonymous GetObject on the GroundX bucket when bypassing the proxy.
-  # Existing policy statements are retained. Keep false for protected files.
+  # Optionally let file and image links open without storage credentials.
+  # Existing permissions are kept. Leave false when file protection is enabled.
   publicRead: false
 
-# The proxy remains enabled by default. With GroundX 0.2.8 or later, disabling
-# it routes the same Service hostname directly to S4; see README for read access.
+# Keep the existing proxy by default. Turning it off connects directly to S4
+# without changing saved file links. See README for the required read permissions.
 s4PathProxy:
   enabled: true
   image: registry.redhat.io/ubi9/python-311:latest
@@ -176,8 +176,8 @@ groundx:
       gpuLayout: groundx-node
       gpuRanker: groundx-node
       gpuSummary: groundx-node
-  # Native S4 requires GroundX chart/images 0.2.8 or later. Keep the historical
-  # Service hostname because GroundX saves full object URLs with documents.
+  # S4 requires GroundX 0.2.8 or later. Keep this address so previously uploaded
+  # files still open.
   # Credentials: set groundx.file.username / password in secret.yaml.
   file:
     existing:
