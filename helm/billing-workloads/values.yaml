@@ -176,12 +176,12 @@ groundx:
   # Point GroundX at the path-normalizing proxy (not raw S4).
   # Raw S4 is http://s4:7480 — used by notebook + bucket bootstrap.
   #
-  # MUST stay serviceType "minio" (not "s3"). With "s3", GroundX uses the AWS
+  # MUST stay serviceType "s4" (not "s3"). With "s3", GroundX uses the AWS
   # SDK and ignores the custom endpoint → real AWS → InvalidAccessKeyId.
   # Credentials: set groundx.file.username / password in secret.yaml.
   file:
     existing:
-      serviceType: minio
+      serviceType: s4
       url: http://s4-s3-proxy:7480
       region: us-east-1
   groundx:
