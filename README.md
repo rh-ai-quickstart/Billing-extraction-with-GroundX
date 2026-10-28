@@ -19,8 +19,7 @@ Extract structured financial and billing data from unstructured documents, such 
 - [Deploy](#deploy)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Upgrade an existing S4 installation](#upgrade-an-existing-s4-installation)
-  - [Validate storage changes](#validate-storage-changes)
+  - [Optional direct S4 access](#optional-direct-s4-access)
   - [Access the UI](#access-the-ui)
   - [Monitor deployment](#monitor-deployment)
   - [Delete](#delete)
@@ -35,7 +34,7 @@ Extract structured financial and billing data from unstructured documents, such 
 
 For many organizations, critical financial and billing information remains locked inside unstructured formats like scans, PDFs, and images. Extracting this data traditionally requires slow, error-prone manual entry or brittle, template-based OCR systems that break whenever a vendor shifts a column or alters a layout. Processing complex document structures—such as nested tables, multi-page invoices, and diverse document formats—at scale remains a highly complex technical challenge.
 
-This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with an extraction demo. You will deploy GroundX from Valantor to automate billing data extraction within an on-premises AI environment powered by Red Hat OpenShift AI&reg;.
+This AI quickstart is designed to bypass those hurdles, helping you get up and running quickly with a robust, production-ready extraction pipeline. You will deploy GroundX from Valantor to automate billing data extraction within a secure, on-premises AI environment powered by Red Hat OpenShift AI&reg;.
 
 ### What you'll do
 
@@ -66,7 +65,7 @@ This quickstart was developed and tested on a Red Hat OpenShift&reg; cluster wit
 
 ### Minimum software requirements
 
-The original OpenShift validation used the following software versions:
+This quickstart was tested with the following software versions:
 
 | Software                           | Version  |
 | ---------------------------------- |:---------|
@@ -76,9 +75,6 @@ The original OpenShift validation used the following software versions:
 | Red Hat OpenShift AI               | 3.4      |
 | helm                               | 3.17.1   |
 | GroundX                            | 2.9.92   |
-
-Native S4 requires GroundX chart and images **0.2.8 or later**. Validate the
-resolved version on OpenShift using the acceptance steps below.
 
 ### Required user permissions
 
@@ -108,24 +104,16 @@ Object storage is provided by the shared **[aws-compatible-storage](https://gith
 | Consumer | Endpoint / resource |
 |----------|---------------------|
 | In-cluster S3 API | `http://s4:7480` |
-| GroundX (direct S4 Service alias) | `http://s4-s3-proxy:7480` |
+| GroundX (via path proxy) | `http://s4-s3-proxy:7480` |
 | S4 web UI Route | Route name `s4` (port 5000 / `/api`) |
 | Credentials Secret | `s4-credentials` (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) |
 | Bootstrap buckets | `eyelevel`, `billing-artifacts` (parent Job) |
 
 External S3 API Route (`s4-api`) is disabled by default (`aws-compatible-storage.route.s3Api.enabled: false`).
 
-S4 is for demos and proofs of concept, with one storage replica. The bootstrap
-Job allows anonymous object reads on the GroundX bucket (`eyelevel` by default)
-because extraction images and file links use unsigned reads. It does not grant
-anonymous writes or change the `billing-artifacts` bucket policy. Keep the S3 API
-inside the cluster and use non-sensitive demo documents. Authenticated private
-file access requires a separate deployment configuration; the chart rejects
-`groundx.fileAccess.enabled: true` with `awsCompatibleStorageBuckets.publicRead: true`.
-
-The historical `s4-s3-proxy` Service name is retained because documents contain
-full storage URLs. By default it targets S4 directly, without a proxy pod.
-`s4PathProxy.enabled: true` retains the compatibility proxy for staged upgrades.
+GroundX chart and images 0.2.8 or later use the native `s4` storage client.
+The compatibility proxy remains enabled by default, and bucket policies are
+unchanged unless `awsCompatibleStorageBuckets.publicRead` is explicitly enabled.
 
 ### Prerequisites
 
@@ -188,65 +176,40 @@ No shell environment variables are required for install. Helm merges `secret.yam
 make -C helm install
 ```
 
-The installer runs `helm dependency update`, resolving the versions allowed by
-each `Chart.yaml`. Check the resolved versions before upgrading an existing
-deployment; native S4 requires GroundX 0.2.8 or later.
+### Optional direct S4 access
 
-### Upgrade an existing S4 installation
+With GroundX 0.2.8 or later, `s4PathProxy.enabled: false` routes the existing
+`s4-s3-proxy:7480` Service directly to S4, keeping saved document URLs unchanged.
+Unsigned extraction image and file-link reads then need an appropriate bucket
+policy. For an unprotected demo bucket, `awsCompatibleStorageBuckets.publicRead: true`
+adds anonymous `s3:GetObject` on the GroundX bucket only, retaining existing
+policy statements. It does not grant anonymous writes or alter `billing-artifacts`.
+Keep this flag false for protected file access or a separately managed policy.
+Disabling the flag does not revoke previously granted access.
 
-Keep the existing S4 volume, credentials, namespace, and GroundX storage URL.
-These steps replace the proxy, not the object store; no data copy or ingestion
-pause is required. GroundX images still roll during the chart upgrade, so use
-your deployment's normal rollout window. Review dependency updates before
-upgrading, including compatibility with the installed operators and Kafka.
-
-From the repository root, using the existing `secret.yaml` and any additional
-values files used by this deployment:
+For an existing S4 quickstart, prepare the read policy before bypassing the proxy.
+Use the existing credentials and all deployment-specific values files in both
+upgrades. The S4 volume, credentials and storage URL must remain unchanged:
 
 ```bash
-make -C helm dependencies
-
-# Keep the proxy while the Job prepares reads on the existing GroundX bucket.
+helm dependency update helm/billing-workloads
 oc delete job billing-workloads-s4-create-buckets -n groundx --ignore-not-found
 helm upgrade billing-workloads helm/billing-workloads -n groundx \
-  -f helm/billing-workloads/values.yaml \
-  -f helm/billing-workloads/secret.yaml --set s4PathProxy.enabled=true
+  -f helm/billing-workloads/values.yaml -f helm/billing-workloads/secret.yaml \
+  --set s4PathProxy.enabled=true --set awsCompatibleStorageBuckets.publicRead=true
 oc wait -n groundx --for=condition=complete \
   job/billing-workloads-s4-create-buckets --timeout=300s
 
-# Switch the same Service hostname directly to S4 after the Job succeeds.
+# Continue only after the Job succeeds and existing document links still work.
 helm upgrade billing-workloads helm/billing-workloads -n groundx \
-  -f helm/billing-workloads/values.yaml \
-  -f helm/billing-workloads/secret.yaml --set s4PathProxy.enabled=false
+  -f helm/billing-workloads/values.yaml -f helm/billing-workloads/secret.yaml \
+  --set s4PathProxy.enabled=false --set awsCompatibleStorageBuckets.publicRead=true
 ```
 
-Stop if the Job fails. Check an existing document link and a new extraction
-after each upgrade. To restore proxy routing, repeat the upgrade with
-`--set s4PathProxy.enabled=true`; keep GroundX 0.2.8 and the existing S4 data.
-This procedure covers the S4 quickstart, not migration from a MinIO installation.
-
-### Validate storage changes
-
-Local checks require Helm and PyYAML:
-
-```bash
-make -C helm dependencies
-python3 -m unittest discover -s helm/tests -v
-```
-
-The storage integration test additionally requires boto3 and a disposable S4
-0.3.2 instance with its default test credentials. It creates two test buckets
-and writes sample objects. Never point it at a shared or deployed store:
-
-```bash
-S4_TEST_ENDPOINT=http://127.0.0.1:7480 \
-  python3 -m unittest discover -s helm/tests -v
-```
-
-Before rollout, validate on OpenShift: complete a UI upload and extraction;
-open its source, X-Ray and page images; confirm unsigned writes fail and
-`billing-artifacts` remains private; then repeat with a document created before
-the upgrade. Rendering alone does not establish this acceptance.
+This switches routing to the same store; it does not copy data. Normal GroundX
+image rollouts still apply. To restore proxy routing, repeat the upgrade with
+`s4PathProxy.enabled=true`. Validate a new extraction and existing source, X-Ray
+and page-image links on OpenShift before deploying direct routing.
 
 ### Access the UI
 

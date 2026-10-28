@@ -1,4 +1,4 @@
-"""Run after make -C helm dependencies.
+"""Run after helm dependency update helm/billing-workloads.
 
 Set S4_TEST_ENDPOINT to an empty, disposable S4 instance to also test bucket
 initialization. That test creates buckets and writes sample objects.
@@ -42,7 +42,7 @@ def find(items, kind, name):
 
 class StorageRenderingTests(unittest.TestCase):
     def test_saved_storage_hostname_reaches_s4_without_proxy(self):
-        items = resources()
+        items = resources("--set", "s4PathProxy.enabled=false")
         service = find(items, "Service", "s4-s3-proxy")
         pod = find(items, "Deployment", "s4")["spec"]["template"]
         for key, value in service["spec"]["selector"].items():
@@ -70,8 +70,8 @@ class StorageRenderingTests(unittest.TestCase):
             self.assertEqual(settings[type_key], "s4")
             self.assertEqual(settings[url_key], "http://s4-s3-proxy:7480/eyelevel/")
 
-    def test_staged_upgrade_can_keep_proxy(self):
-        items = resources("--set", "s4PathProxy.enabled=true")
+    def test_default_install_keeps_proxy(self):
+        items = resources()
         service = find(items, "Service", "s4-s3-proxy")
         pod = find(items, "Deployment", "billing-workloads-s4-s3-proxy")["spec"]["template"]
         for key, value in service["spec"]["selector"].items():
@@ -85,6 +85,7 @@ class StorageRenderingTests(unittest.TestCase):
 
     def test_protected_files_reject_public_bucket_bootstrap(self):
         result = render(
+            "--set", "awsCompatibleStorageBuckets.publicRead=true",
             "--set", "groundx.file.username=,groundx.file.password=",
             "--set", "groundx.file.existing.url=https://files.example.test",
             "--set-json", 'groundx.fileAccess={"enabled":true,"originsPrivate":true,'
@@ -117,19 +118,39 @@ class StorageBootstrapTests(unittest.TestCase):
                               aws_secret_access_key="s4secret",
                               region_name="us-east-1",
                               config=Config(s3={"addressing_style": "path"}))
-        items = resources("--set", "groundx.file.bucketName=billing-test-files",
-                          "--set-json",
-                          'awsCompatibleStorageBuckets.names=["billing-test-files","billing-artifacts"]')
-        job = find(items, "Job", "billing-workloads-s4-create-buckets")
-        command = job["spec"]["template"]["spec"]["containers"][0]["command"][2]
-        script = command.split("python3 << 'EOF'\n", 1)[1].rsplit("EOF", 1)[0]
-        for attempt in range(2):
+        def bootstrap(*overrides):
+            items = resources("--set", "groundx.file.bucketName=billing-test-files",
+                              "--set-json",
+                              'awsCompatibleStorageBuckets.names=["billing-test-files","billing-artifacts"]',
+                              *overrides)
+            job = find(items, "Job", "billing-workloads-s4-create-buckets")
+            command = job["spec"]["template"]["spec"]["containers"][0]["command"][2]
+            script = command.split("python3 << 'EOF'\n", 1)[1].rsplit("EOF", 1)[0]
             subprocess.run([sys.executable, "-c", script], env=env, check=True,
                            capture_output=True, text=True, timeout=120)
-            if attempt == 0:
-                for bucket in ("billing-test-files", "billing-artifacts"):
-                    client.put_object(Bucket=bucket, Key="nested/invoice #1.pdf", Body=b"invoice")
+
+        bootstrap()
+        for bucket in ("billing-test-files", "billing-artifacts"):
+            client.put_object(Bucket=bucket, Key="nested/invoice #1.pdf", Body=b"invoice")
         path = quote("nested/invoice #1.pdf", safe="/")
+        with self.assertRaises(HTTPError) as error:
+            urlopen(f"{endpoint}/billing-test-files/{path}", timeout=5)
+        self.assertEqual(error.exception.code, 403)
+
+        custom_policy = {"Version": "2012-10-17", "Statement": [{
+            "Effect": "Allow", "Principal": {"AWS": ["*"]},
+            "Action": ["s3:ListBucket"], "Resource": ["arn:aws:s3:::billing-test-files"],
+        }]}
+        import json
+        client.put_bucket_policy(Bucket="billing-test-files", Policy=json.dumps(custom_policy))
+        bootstrap()
+        self.assertEqual(json.loads(client.get_bucket_policy(Bucket="billing-test-files")["Policy"]),
+                         custom_policy)
+        for attempt in range(2):
+            bootstrap("--set", "s4PathProxy.enabled=false",
+                      "--set", "awsCompatibleStorageBuckets.publicRead=true")
+        with urlopen(f"{endpoint}/billing-test-files?list-type=2", timeout=5) as response:
+            self.assertEqual(response.status, 200)
         with urlopen(f"{endpoint}/billing-test-files/{path}", timeout=5) as response:
             self.assertEqual(response.read(), b"invoice")
         for request in (Request(f"{endpoint}/billing-artifacts/{path}"),
@@ -137,6 +158,12 @@ class StorageBootstrapTests(unittest.TestCase):
             with self.assertRaises(HTTPError) as error:
                 urlopen(request, timeout=5)
             self.assertEqual(error.exception.code, 403)
+        bootstrap("--set", "groundx.file.bucketName=billing-new-files",
+                  "--set-json", 'awsCompatibleStorageBuckets.names=["billing-new-files"]',
+                  "--set", "awsCompatibleStorageBuckets.publicRead=true")
+        client.put_object(Bucket="billing-new-files", Key="invoice.pdf", Body=b"new invoice")
+        with urlopen(f"{endpoint}/billing-new-files/invoice.pdf", timeout=5) as response:
+            self.assertEqual(response.read(), b"new invoice")
 
 
 if __name__ == "__main__":

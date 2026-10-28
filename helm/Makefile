@@ -24,7 +24,7 @@ ifneq (,$(wildcard $(WORKLOADS_SECRET)))
 WORKLOADS_HELM_FLAGS += -f $(WORKLOADS_SECRET)
 endif
 
-.PHONY: install dependencies uninstall terminate cleanup diagnose \
+.PHONY: install uninstall terminate cleanup diagnose \
 	login-ui-quay build-ui-image push-ui-image publish-ui-image
 
 ## Build / push Streamlit UI image to Quay (podman)
@@ -45,13 +45,6 @@ publish-ui-image: push-ui-image
 	@oc rollout restart deployment/$(UI_DEPLOYMENT) -n $(NAMESPACE)
 	@oc rollout status deployment/$(UI_DEPLOYMENT) -n $(NAMESPACE) --timeout=300s
 
-dependencies:
-	helm repo add billing-groundx https://registry.groundx.ai/helm
-	helm repo add billing-percona https://percona.github.io/percona-helm-charts/
-	helm repo add billing-ai-architecture https://rh-ai-quickstart.github.io/ai-architecture-charts
-	helm dependency update $(HELM_OPERATORS)
-	helm dependency update $(HELM_WORKLOADS)
-
 install:
 	@test -f $(WORKLOADS_SECRET) || ( \
 		echo "ERROR: $(WORKLOADS_SECRET) not found."; \
@@ -63,8 +56,9 @@ install:
 		echo "ERROR: $(WORKLOADS_SECRET) is missing MYSQL_INIT_USER."; \
 		echo "  Fix the key name (not MYSQL_INIT_U…SER) and re-run."; \
 		exit 1)
-	$(MAKE) dependencies
 	oc create namespace $(NAMESPACE) --dry-run=client -o yaml | oc apply -f - || true
+	cd $(HELM_OPERATORS) && helm dependency update
+	cd $(HELM_WORKLOADS) && helm dependency update
 	helm upgrade --install billing-operators $(HELM_OPERATORS) $(OPERATORS_HELM_FLAGS) -n $(NAMESPACE)
 	# Job specs are immutable — remove prior S4 bootstrap Job so upgrade can recreate it
 	oc delete job -n $(NAMESPACE) -l app.kubernetes.io/component=s4-bootstrap --ignore-not-found || true
@@ -80,6 +74,9 @@ diagnose:
 	@echo ""
 	@echo "=== S4 proxy / bucket jobs ==="
 	@oc get deploy,svc,jobs -n $(NAMESPACE) 2>&1 | grep -E 'NAME|s4|proxy|bucket' || true
+	@echo ""
+	@echo "=== s4-s3-proxy logs (tail) ==="
+	@oc logs -n $(NAMESPACE) deploy/billing-workloads-s4-s3-proxy --tail=30 2>&1 || true
 	@echo ""
 	@echo "=== s4-create-buckets logs (tail) ==="
 	@oc logs -n $(NAMESPACE) job/billing-workloads-s4-create-buckets --tail=40 2>&1 || true

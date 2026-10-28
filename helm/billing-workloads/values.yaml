@@ -112,14 +112,14 @@ awsCompatibleStorageBuckets:
     - eyelevel
     - billing-artifacts
   region: us-east-1
-  # Anonymous GetObject on the GroundX demo bucket only, not billing-artifacts.
-  # Disable when configuring GroundX protected file access.
-  publicRead: true
+  # Opt-in anonymous GetObject on the GroundX bucket when bypassing the proxy.
+  # Existing policy statements are retained. Keep false for protected files.
+  publicRead: false
 
-# Optional compatibility proxy for staged upgrades. GroundX 0.2.8 supports S4
-# directly. The s4-s3-proxy Service keeps its name so stored file URLs survive.
+# The proxy remains enabled by default. With GroundX 0.2.8 or later, disabling
+# it routes the same Service hostname directly to S4; see README for read access.
 s4PathProxy:
-  enabled: false
+  enabled: true
   image: registry.redhat.io/ubi9/python-311:latest
   imagePullPolicy: IfNotPresent
   upstream: http://s4:7480

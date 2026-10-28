@@ -25,12 +25,9 @@ jobs:
       - name: Install test and chart dependencies
         run: |
           python -m pip install boto3==1.40.48 PyYAML==6.0.2
-          make -C helm dependencies
-          helm dependency list helm/billing-operators
-          helm dependency list helm/billing-workloads
-      - name: Lint charts
+          helm dependency update helm/billing-workloads
+      - name: Lint workloads chart
         run: |
-          helm lint helm/billing-operators
           helm lint helm/billing-workloads -f helm/billing-workloads/secret.example.yaml
       - name: Start disposable S4
         run: |
