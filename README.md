@@ -111,7 +111,7 @@ Object storage is provided by the shared **[aws-compatible-storage](https://gith
 External S3 API Route (`s4-api`) is disabled by default (`aws-compatible-storage.route.s3Api.enabled: false`).
 
 GroundX uses the native `s4` storage client, requiring GroundX chart and images
-0.2.8 or later. The existing proxy handles file reads without changing bucket permissions.
+0.2.8 or later.
 
 ### Prerequisites
 

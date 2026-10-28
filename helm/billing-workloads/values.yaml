@@ -173,7 +173,11 @@ groundx:
       gpuLayout: groundx-node
       gpuRanker: groundx-node
       gpuSummary: groundx-node
-  # Use the native S4 client (GroundX 0.2.8 or later) through the existing proxy.
+  # Point GroundX at the path-normalizing proxy (not raw S4).
+  # Raw S4 is http://s4:7480 — used by notebook + bucket bootstrap.
+  #
+  # MUST stay serviceType "s4" (not "s3"). With "s3", GroundX uses the AWS
+  # SDK and ignores the custom endpoint → real AWS → InvalidAccessKeyId.
   # Credentials: set groundx.file.username / password in secret.yaml.
   file:
     existing:
