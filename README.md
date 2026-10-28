@@ -77,8 +77,8 @@ The original OpenShift validation used the following software versions:
 | helm                               | 3.17.1   |
 | GroundX                            | 2.9.92   |
 
-The Helm dependencies now pin GroundX chart and images **0.2.8**, which support
-native S4. Validate this combination on OpenShift using the acceptance steps below.
+Native S4 requires GroundX chart and images **0.2.8 or later**. Validate the
+resolved version on OpenShift using the acceptance steps below.
 
 ### Required user permissions
 
@@ -188,19 +188,17 @@ No shell environment variables are required for install. Helm merges `secret.yam
 make -C helm install
 ```
 
-The installer downloads the exact versions in both `Chart.lock` files using
-`helm dependency build`. It does not update dependency versions during installation.
-To intentionally upgrade dependencies, edit the relevant `Chart.yaml`, run
-`helm dependency update` for that chart, validate, and commit both files together.
+The installer runs `helm dependency update`, resolving the versions allowed by
+each `Chart.yaml`. Check the resolved versions before upgrading an existing
+deployment; native S4 requires GroundX 0.2.8 or later.
 
 ### Upgrade an existing S4 installation
 
 Keep the existing S4 volume, credentials, namespace, and GroundX storage URL.
 These steps replace the proxy, not the object store; no data copy or ingestion
 pause is required. GroundX images still roll during the chart upgrade, so use
-your deployment's normal rollout window. Do not downgrade operators or Kafka to
-the pinned versions if the deployment already uses newer charts. Keep those
-versions in `Chart.yaml` and regenerate the lock before upgrading.
+your deployment's normal rollout window. Review dependency updates before
+upgrading, including compatibility with the installed operators and Kafka.
 
 From the repository root, using the existing `secret.yaml` and any additional
 values files used by this deployment:

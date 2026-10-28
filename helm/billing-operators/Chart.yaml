@@ -8,17 +8,17 @@ type: application
 dependencies:
   - name: groundx-storageclass
     repository: https://registry.groundx.ai/helm
-    version: "0.1.1"
+    version: "*"
     condition: groundx-storageclass.enabled
 
   - name: pxc-operator
     alias: db-operator
     repository: https://percona.github.io/percona-helm-charts/
-    version: "1.20.1"
+    version: "*"
     condition: db-operator.enabled
 
   - name: strimzi-kafka-operator
     alias: stream-operator
     repository: oci://quay.io/strimzi-helm
-    version: "1.2.0"
+    version: "*"
     condition: stream-operator.enabled

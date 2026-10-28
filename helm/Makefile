@@ -49,8 +49,8 @@ dependencies:
 	helm repo add billing-groundx https://registry.groundx.ai/helm
 	helm repo add billing-percona https://percona.github.io/percona-helm-charts/
 	helm repo add billing-ai-architecture https://rh-ai-quickstart.github.io/ai-architecture-charts
-	helm dependency build $(HELM_OPERATORS)
-	helm dependency build $(HELM_WORKLOADS)
+	helm dependency update $(HELM_OPERATORS)
+	helm dependency update $(HELM_WORKLOADS)
 
 install:
 	@test -f $(WORKLOADS_SECRET) || ( \

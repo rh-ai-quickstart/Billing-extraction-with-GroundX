@@ -1,4 +1,4 @@
-"""Run after helm dependency build for both charts.
+"""Run after make -C helm dependencies.
 
 Set S4_TEST_ENDPOINT to an empty, disposable S4 instance to also test bucket
 initialization. That test creates buckets and writes sample objects.
